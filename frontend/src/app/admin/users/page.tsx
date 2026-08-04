@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, User } from "@/services/dbSimulator";
-import { 
-  Users, Plus, Pencil, Trash2, X, Save, Mail, 
+import { getSessionUser } from "@/lib/session";
+import {
+  Users, Plus, Pencil, Trash2, X, Save, Mail,
   User as UserIcon, Lock, CheckCircle, Search, ShieldCheck
 } from "lucide-react";
 
@@ -29,10 +30,6 @@ export default function UserManagement() {
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -44,6 +41,10 @@ export default function UserManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchData);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -77,9 +78,8 @@ export default function UserManagement() {
 
   const handleDeleteUser = async (id: string) => {
     // Prevent self deletion
-    const sessionUserStr = localStorage.getItem("session_user");
-    if (sessionUserStr) {
-      const activeUser = JSON.parse(sessionUserStr) as User;
+    const activeUser = getSessionUser<User>();
+    if (activeUser) {
       if (activeUser.id === id) {
         alert("Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.");
         return;
@@ -332,7 +332,7 @@ export default function UserManagement() {
                     <label className="text-[11px] font-bold text-slate-400 uppercase">Role Pengguna</label>
                     <select 
                       value={role}
-                      onChange={(e) => setRole(e.target.value as any)}
+                      onChange={(e) => setRole(e.target.value as "admin" | "tenant")}
                       className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all"
                       disabled={modalMode === "edit" && role === "tenant"} // protect tenant role modifications
                     >

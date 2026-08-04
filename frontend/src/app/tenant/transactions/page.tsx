@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction, Tenant, Menu } from "@/services/dbSimulator";
-import { 
+import { getSessionTenant } from "@/lib/session";
+import {
   ReceiptText, Search, Printer, FileSpreadsheet, CheckCircle
 } from "lucide-react";
 
@@ -19,25 +20,20 @@ export default function TenantTransactions() {
 
   const [toastMessage, setToastMessage] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
       
-      const sessionTenantStr = localStorage.getItem("session_tenant");
-      if (!sessionTenantStr) return;
-      const tenantObj = JSON.parse(sessionTenantStr) as Tenant;
-      setActiveTenant(tenantObj);
+      const sessionTenant = getSessionTenant<Tenant>();
+      if (!sessionTenant) return;
+      setActiveTenant(sessionTenant);
 
       const txList = await dbSimulator.getTransactions();
       const menuList = await dbSimulator.getMenus();
-      
+
       // Filter by active tenant and sort by date descending
       const tenantTxs = txList
-        .filter(t => t.tenant_id === tenantObj.id)
+        .filter(t => t.tenant_id === sessionTenant.id)
         .sort((a, b) => b.tanggal_transaksi.localeCompare(a.tanggal_transaksi));
 
       setTransactions(tenantTxs);
@@ -48,6 +44,10 @@ export default function TenantTransactions() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchData);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);

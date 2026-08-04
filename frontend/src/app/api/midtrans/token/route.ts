@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     const tokenBase64 = Buffer.from(serverKey + ':').toString('base64');
     
-    const response = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
+    const response = await fetch('https://app.midtrans.com/snap/v1/transactions', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
           order_id: orderId,
           gross_amount: grossAmount
         },
-        item_details: items?.map((item: any) => ({
+        item_details: items?.map((item: { id: string; price: number; quantity: number; name: string }) => ({
           id: item.id,
           price: item.price,
           quantity: item.quantity,
@@ -58,14 +58,15 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ token: data.token, redirectUrl: data.redirect_url, isMock: false });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating Midtrans token:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     // Fallback to mock mode on connection error or any other errors
     return NextResponse.json({ 
       token: `mock-snap-token-${Date.now()}`, 
       redirectUrl: '#',
       isMock: true,
-      error: error.message || 'Unknown error'
+      error: errorMessage
     });
   }
 }

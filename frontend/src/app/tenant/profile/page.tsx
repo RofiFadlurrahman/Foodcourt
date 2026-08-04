@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Tenant, User } from "@/services/dbSimulator";
-import { 
+import { getSessionTenant, getSessionUser, setSessionTenant, setSessionUser } from "@/lib/session";
+import {
   User as UserIcon, Store, Phone, Mail, Save, CheckCircle, AlertCircle, Loader2
 } from "lucide-react";
 
@@ -23,21 +24,20 @@ export default function TenantProfile() {
 
   useEffect(() => {
     // Load session info
-    const sessionUserStr = localStorage.getItem("session_user");
-    const sessionTenantStr = localStorage.getItem("session_tenant");
+    const sessionUser = getSessionUser<User>();
+    const sessionTenant = getSessionTenant<Tenant>();
 
-    if (sessionUserStr) {
-      setUser(JSON.parse(sessionUserStr));
-    }
-    if (sessionTenantStr) {
-      const tenantObj = JSON.parse(sessionTenantStr) as Tenant;
-      setTenant(tenantObj);
-      setNamaTenant(tenantObj.nama_tenant);
-      setNamaPemilik(tenantObj.nama_pemilik);
-      setHp(tenantObj.hp);
-      setEmail(tenantObj.email);
-      setFoto(tenantObj.foto);
-    }
+    setTimeout(() => {
+      if (sessionUser) setUser(sessionUser);
+      if (sessionTenant) {
+        setTenant(sessionTenant);
+        setNamaTenant(sessionTenant.nama_tenant);
+        setNamaPemilik(sessionTenant.nama_pemilik);
+        setHp(sessionTenant.hp);
+        setEmail(sessionTenant.email);
+        setFoto(sessionTenant.foto);
+      }
+    }, 0);
   }, []);
 
   const showToast = (msg: string) => {
@@ -67,7 +67,7 @@ export default function TenantProfile() {
         foto: foto.trim()
       };
       await dbSimulator.saveTenant(updatedTenant);
-      localStorage.setItem("session_tenant", JSON.stringify(updatedTenant));
+      setSessionTenant(updatedTenant);
       setTenant(updatedTenant);
 
       // 2. Update User details matching email & full name
@@ -77,7 +77,7 @@ export default function TenantProfile() {
         email: email.trim()
       };
       await dbSimulator.saveUser(updatedUser);
-      localStorage.setItem("session_user", JSON.stringify(updatedUser));
+      setSessionUser(updatedUser);
       setUser(updatedUser);
 
       showToast("Profil outlet kedai berhasil disimpan.");

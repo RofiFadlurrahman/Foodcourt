@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Menu, Tenant } from "@/services/dbSimulator";
-import { 
+import { getSessionTenant } from "@/lib/session";
+import {
   UtensilsCrossed, Plus, Pencil, Trash2, X, Save, CheckCircle, Search
 } from "lucide-react";
 
@@ -30,23 +31,18 @@ export default function TenantMenuManagement() {
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
       
       // Get active tenant from session
-      const sessionTenantStr = localStorage.getItem("session_tenant");
-      if (!sessionTenantStr) return;
-      const tenantObj = JSON.parse(sessionTenantStr) as Tenant;
-      setActiveTenant(tenantObj);
+      const sessionTenant = getSessionTenant<Tenant>();
+      if (!sessionTenant) return;
+      setActiveTenant(sessionTenant);
 
       // Get all menus and filter by active tenant
       const allMenus = await dbSimulator.getMenus();
-      const tenantMenus = allMenus.filter(m => m.tenant_id === tenantObj.id);
+      const tenantMenus = allMenus.filter(m => m.tenant_id === sessionTenant.id);
       setMenus(tenantMenus);
     } catch (e) {
       console.error(e);
@@ -54,6 +50,10 @@ export default function TenantMenuManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchData);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -324,7 +324,7 @@ export default function TenantMenuManagement() {
                     <label className="text-[11px] font-bold text-slate-400 uppercase">Kategori</label>
                     <select 
                       value={kategori}
-                      onChange={(e) => setKategori(e.target.value as any)}
+                      onChange={(e) => setKategori(e.target.value as 'Makanan' | 'Minuman' | 'Cemilan')}
                       className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all"
                     >
                       <option value="Makanan">Makanan</option>
@@ -348,7 +348,7 @@ export default function TenantMenuManagement() {
                     <label className="text-[11px] font-bold text-slate-400 uppercase">Status Ketersediaan</label>
                     <select 
                       value={status}
-                      onChange={(e) => setStatus(e.target.value as any)}
+                      onChange={(e) => setStatus(e.target.value as 'ready' | 'empty')}
                       className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all"
                     >
                       <option value="ready">Ready (Tersedia)</option>

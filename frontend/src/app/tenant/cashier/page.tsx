@@ -3,14 +3,51 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Menu, Tenant, Transaction } from "@/services/dbSimulator";
-import { 
-  ShoppingCart, Search, Plus, Minus, Trash2, CreditCard, 
+import { getSessionTenant } from "@/lib/session";
+import {
+  ShoppingCart, Search, Plus, Minus, Trash2, CreditCard,
   DollarSign, CheckCircle2, QrCode, X, Printer, Loader2, Wallet, Lock, Shield
 } from "lucide-react";
 
 interface CartItem {
   menu: Menu;
   qty: number;
+}
+
+interface MockSnapDetails {
+  orderId: string;
+  total: number;
+  items: {
+    name: string;
+    qty: number;
+    price: number;
+  }[];
+}
+
+interface ReceiptTx {
+  id: string;
+  date: string;
+  items: {
+    name: string;
+    qty: number;
+    harga: number;
+    total: number;
+  }[];
+  total: number;
+  paymentMethod: string;
+  cashPaid: number;
+  change: number;
+}
+
+interface WindowWithSnap extends Window {
+  snap?: {
+    pay: (token: string, callbacks: {
+      onSuccess: (result: unknown) => void;
+      onPending: (result: unknown) => void;
+      onError: (result: unknown) => void;
+      onClose: () => void;
+    }) => void;
+  };
 }
 
 export default function TenantCashier() {
@@ -31,17 +68,35 @@ export default function TenantCashier() {
   // Midtrans Mock/Simulated Snap States
   const [isMockSnapOpen, setIsMockSnapOpen] = useState(false);
   const [mockSnapToken, setMockSnapToken] = useState("");
-  const [mockSnapDetails, setMockSnapDetails] = useState<any>(null);
+  const [mockSnapDetails, setMockSnapDetails] = useState<MockSnapDetails | null>(null);
   const [mockSnapPaymentType, setMockSnapPaymentType] = useState<"qris" | "va" | "cc">("qris");
   const [mockProcessing, setMockProcessing] = useState(false);
 
   // Virtual Receipt Modal
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  const [receiptTx, setReceiptTx] = useState<any>(null);
+  const [receiptTx, setReceiptTx] = useState<ReceiptTx | null>(null);
   const [changeAmount, setChangeAmount] = useState(0);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      const sessionTenant = getSessionTenant<Tenant>();
+      if (!sessionTenant) return;
+      setActiveTenant(sessionTenant);
+
+      const menuList = await dbSimulator.getMenus();
+      const tenantMenus = menuList.filter(m => m.tenant_id === sessionTenant.id);
+      setMenus(tenantMenus);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchData();
+    void Promise.resolve().then(fetchData);
 
     // Dynamically inject Midtrans Snap Sandbox script
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "SB-Mid-client-YOUR_DUMMY_KEY";
@@ -54,24 +109,6 @@ export default function TenantCashier() {
       document.body.removeChild(script);
     };
   }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const sessionTenantStr = localStorage.getItem("session_tenant");
-      if (!sessionTenantStr) return;
-      const tenantObj = JSON.parse(sessionTenantStr) as Tenant;
-      setActiveTenant(tenantObj);
-
-      const allMenus = await dbSimulator.getMenus();
-      const tenantMenus = allMenus.filter(m => m.tenant_id === tenantObj.id);
-      setMenus(tenantMenus);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const addToCart = (menu: Menu) => {
     if (menu.stok <= 0 || menu.status === "empty") return;
@@ -201,15 +238,16 @@ export default function TenantCashier() {
           });
           setIsMockSnapOpen(true);
         } else {
-          if ((window as any).snap) {
-            (window as any).snap.pay(data.token, {
-              onSuccess: async function (result: any) {
+          const win = window as WindowWithSnap;
+          if (win.snap) {
+            win.snap.pay(data.token, {
+              onSuccess: async function (result: unknown) {
                 await saveTransactionToLocal("Midtrans", total, 0);
               },
-              onPending: function (result: any) {
+              onPending: function (result: unknown) {
                 alert("Pembayaran pending. Selesaikan proses pembayaran Anda.");
               },
-              onError: function (result: any) {
+              onError: function (result: unknown) {
                 alert("Pembayaran gagal!");
               },
               onClose: function () {
@@ -293,50 +331,50 @@ export default function TenantCashier() {
   return (
     <DashboardLayout roleRequired="tenant">
       <div className="space-y-6">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Point of Sales (POS)</h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Antarmuka kasir digital cepat untuk mencatat penjualan kedai kuliner.</p>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">Mesin Kasir (POS)</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">Catat pesanan pelanggan, cetak struk, simpan ke laporan.</p>
           </div>
         </div>
 
         {loading ? (
-          <div className="grid lg:grid-cols-3 gap-6 animate-pulse">
-            <div className="lg:col-span-2 h-[450px] bg-slate-800 rounded-2xl" />
-            <div className="h-[450px] bg-slate-800 rounded-2xl" />
+          <div className="grid lg:grid-cols-3 gap-5 animate-pulse">
+            <div className="lg:col-span-2 h-[450px] bg-muted border border-border rounded-md" />
+            <div className="h-[450px] bg-muted border border-border rounded-md" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
             {/* LEFT PANEL - MENU SELECTION CATALOG */}
             <div className="lg:col-span-2 space-y-4">
-              
+
               {/* Search & Category Filter */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-4 flex flex-col sm:flex-row gap-3">
+              <div className="bg-card border border-border rounded-md p-4 flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                     <Search className="w-4 h-4" />
                   </div>
                   <input
                     type="text"
-                    placeholder="Cari menu makanan/minuman..."
+                    placeholder="Cari menu..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-100 border border-transparent rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    className="w-full bg-muted border border-transparent rounded-md pl-9 pr-4 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-colors"
                   />
                 </div>
 
-                <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+                <div className="flex bg-muted p-1 rounded-md text-xs font-bold self-start sm:self-auto">
                   {["all", "Makanan", "Minuman", "Cemilan"].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setCategoryFilter(cat)}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${
-                        categoryFilter === cat 
-                          ? "bg-indigo-600 text-white shadow-sm" 
-                          : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                      className={`px-3 py-1.5 rounded transition-colors ${
+                        categoryFilter === cat
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {cat === "all" ? "Semua" : cat}
@@ -346,36 +384,36 @@ export default function TenantCashier() {
               </div>
 
               {/* Menus Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
                 {filteredMenus.map((menu) => {
                   const isOutOfStock = menu.stok <= 0 || menu.status === "empty";
                   return (
                     <div
                       key={menu.id}
                       onClick={() => !isOutOfStock && addToCart(menu)}
-                      className={`bg-white dark:bg-[#0d1222] border rounded-2xl overflow-hidden shadow-sm p-3 hover:shadow-md cursor-pointer transition-all hover:-translate-y-0.5 flex flex-col justify-between ${
-                        isOutOfStock 
-                          ? "opacity-50 border-slate-200 dark:border-slate-800 cursor-not-allowed" 
-                          : "border-slate-200 dark:border-slate-800/40 hover:border-indigo-500/50"
+                      className={`bg-card border rounded-md overflow-hidden p-3 cursor-pointer transition-colors flex flex-col justify-between ${
+                        isOutOfStock
+                          ? "opacity-50 border-border cursor-not-allowed"
+                          : "border-border hover:border-primary"
                       }`}
                     >
-                      <div className="relative h-24 sm:h-28 rounded-xl overflow-hidden mb-2 bg-slate-800">
-                        <img 
-                          src={menu.foto} 
-                          alt={menu.nama_menu} 
+                      <div className="relative h-24 sm:h-28 rounded overflow-hidden mb-2 bg-muted">
+                        <img
+                          src={menu.foto}
+                          alt={menu.nama_menu}
                           className="w-full h-full object-cover"
                         />
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-slate-950/70 flex items-center justify-center text-[10px] font-bold text-white uppercase tracking-wider">
+                          <div className="absolute inset-0 bg-foreground/70 flex items-center justify-center text-[10px] font-extrabold text-background uppercase tracking-widest">
                             Habis
                           </div>
                         )}
                       </div>
                       <div className="space-y-1 text-xs">
-                        <h4 className="font-bold text-slate-900 dark:text-white truncate">{menu.nama_menu}</h4>
-                        <div className="flex justify-between items-center text-[10px] border-t border-slate-100 dark:border-slate-800/30 pt-1">
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatRupiah(menu.harga)}</span>
-                          <span className="text-slate-400">Stok: {menu.stok}</span>
+                        <h4 className="font-extrabold text-foreground truncate">{menu.nama_menu}</h4>
+                        <div className="flex justify-between items-center text-[10px] border-t border-border pt-1">
+                          <span className="font-extrabold text-primary">{formatRupiah(menu.harga)}</span>
+                          <span className="text-muted-foreground">Stok: {menu.stok}</span>
                         </div>
                       </div>
                     </div>
@@ -386,15 +424,15 @@ export default function TenantCashier() {
             </div>
 
             {/* RIGHT PANEL - SHOPPING CART & PAYMENT CHECKOUT */}
-            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm h-[580px] flex flex-col justify-between">
-              
+            <div className="bg-card border border-border rounded-md p-5 h-[580px] flex flex-col justify-between">
+
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-3">
-                <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                  <ShoppingCart className="w-5 h-5 text-indigo-500" />
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2 font-display font-extrabold text-sm sm:text-base text-foreground">
+                  <ShoppingCart className="w-5 h-5 text-primary" />
                   <span>Daftar Belanja</span>
                 </div>
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-extrabold">
                   {cart.length} Item
                 </span>
               </div>
@@ -402,39 +440,39 @@ export default function TenantCashier() {
               {/* Cart List */}
               <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1 text-xs">
                 {cart.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                     <ShoppingCart className="w-8 h-8 opacity-30" />
-                    <span>Keranjang Anda kosong</span>
+                    <span>Belum ada pesanan. Tap menu di samping.</span>
                   </div>
                 ) : (
                   cart.map((item) => (
-                    <div 
-                      key={item.menu.id} 
-                      className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/20 pb-3"
+                    <div
+                      key={item.menu.id}
+                      className="flex items-center justify-between gap-3 border-b border-border pb-3"
                     >
                       <div className="flex-1 min-w-0">
-                        <span className="font-bold text-slate-900 dark:text-white block truncate">{item.menu.nama_menu}</span>
-                        <span className="text-[10px] text-slate-400">{formatRupiah(item.menu.harga)} x {item.qty}</span>
+                        <span className="font-extrabold text-foreground block truncate">{item.menu.nama_menu}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatRupiah(item.menu.harga)} × {item.qty}</span>
                       </div>
-                      
+
                       {/* Qty Controls */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button 
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
                           onClick={() => updateQty(item.menu.id, -1)}
-                          className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300"
+                          className="p-1 rounded bg-muted hover:bg-muted/70 text-foreground"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="font-bold w-4 text-center">{item.qty}</span>
-                        <button 
+                        <span className="font-extrabold w-4 text-center text-foreground">{item.qty}</span>
+                        <button
                           onClick={() => updateQty(item.menu.id, 1)}
-                          className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300"
+                          className="p-1 rounded bg-muted hover:bg-muted/70 text-foreground"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => removeFromCart(item.menu.id)}
-                          className="p-1 text-rose-400 hover:bg-rose-500/10 rounded ml-1"
+                          className="p-1 text-destructive hover:bg-destructive/10 rounded ml-1"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -445,21 +483,21 @@ export default function TenantCashier() {
               </div>
 
               {/* Checkout Form */}
-              <form onSubmit={handleCheckout} className="border-t border-slate-100 dark:border-slate-800/40 pt-4 space-y-4">
-                
+              <form onSubmit={handleCheckout} className="border-t border-border pt-4 space-y-4">
+
                 {/* 1. Payment Methods Selection */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Metode Pembayaran</span>
+                  <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Metode Pembayaran</span>
                   <div className="grid grid-cols-4 gap-1.5 text-[10px]">
                     {(["QRIS", "Debit", "Cash", "Midtrans"] as const).map((method) => (
                       <button
                         key={method}
                         type="button"
                         onClick={() => setPaymentMethod(method)}
-                        className={`py-2 rounded-xl border font-bold flex flex-col items-center justify-center gap-1 transition-all hover:scale-[1.02] ${
+                        className={`py-2 rounded border font-extrabold flex flex-col items-center justify-center gap-1 transition-colors ${
                           paymentMethod === method
-                            ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10"
-                            : "bg-slate-100 border-transparent text-slate-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800/80"
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "bg-muted border-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                         }`}
                       >
                         {method === "QRIS" ? (
@@ -469,9 +507,9 @@ export default function TenantCashier() {
                         ) : method === "Cash" ? (
                           <DollarSign className="w-3.5 h-3.5" />
                         ) : (
-                          <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+                          <Wallet className="w-3.5 h-3.5" />
                         )}
-                        <span className="font-semibold">{method}</span>
+                        <span>{method}</span>
                       </button>
                     ))}
                   </div>
@@ -479,35 +517,35 @@ export default function TenantCashier() {
 
                 {/* 2. Cash input */}
                 {paymentMethod === "Cash" && (
-                  <div className="space-y-1 animate-fade-in">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Uang Tunai Diterima *</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold text-muted-foreground uppercase">Uang Tunai Diterima *</label>
                     <input
                       type="number"
                       value={cashAmount}
                       onChange={(e) => setCashAmount(e.target.value)}
-                      placeholder="e.g. 50000"
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all font-mono"
+                      placeholder="contoh: 50000"
+                      className="w-full bg-muted border border-transparent rounded-md p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:bg-card focus:ring-1 focus:ring-primary transition-colors font-mono"
                       required
                     />
                   </div>
                 )}
 
                 {/* 3. Totals display */}
-                <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800/20 pt-3">
-                  <div className="flex justify-between text-xs text-slate-500">
+                <div className="space-y-1.5 border-t border-border pt-3">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Subtotal</span>
                     <span>{formatRupiah(getSubtotal())}</span>
                   </div>
-                  <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-white">
-                    <span>Total Pembayaran</span>
-                    <span className="text-indigo-600 dark:text-indigo-400">{formatRupiah(getSubtotal())}</span>
+                  <div className="flex justify-between text-sm font-extrabold text-foreground">
+                    <span>Total Bayar</span>
+                    <span className="text-primary">{formatRupiah(getSubtotal())}</span>
                   </div>
                 </div>
 
                 {/* 4. Submit button */}
                 <button
                   type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none hover:scale-[1.01] active:scale-[0.99]"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-3 rounded-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none uppercase tracking-wider text-xs"
                   disabled={cart.length === 0 || processing}
                 >
                   {processing ? (
@@ -533,27 +571,27 @@ export default function TenantCashier() {
         {/* 4. VIRTUAL RECEIPT MODAL */}
         {isReceiptOpen && receiptTx && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setIsReceiptOpen(false)} />
-            
-            <div className="relative w-full max-w-sm bg-white text-slate-900 rounded-2xl shadow-2xl p-6 z-10 animate-scale-up font-mono text-xs border border-slate-200">
-              
+            <div className="fixed inset-0 bg-foreground/50" onClick={() => setIsReceiptOpen(false)} />
+
+            <div className="relative w-full max-w-sm receipt rounded-md p-6 z-10 font-mono text-xs">
+
               {/* Modal Close Button */}
-              <button 
+              <button
                 onClick={() => setIsReceiptOpen(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 border rounded"
+                className="absolute top-3 right-3 opacity-60 hover:opacity-100 p-1 border border-current/30 rounded"
               >
                 <X className="w-3 h-3" />
               </button>
 
               {/* Receipt Header */}
-              <div className="text-center space-y-1 mb-4 border-b border-dashed border-slate-300 pb-3">
+              <div className="text-center space-y-1 mb-4 border-b border-dashed border-current/30 pb-3">
                 <h3 className="font-extrabold text-sm uppercase">{activeTenant?.nama_tenant}</h3>
-                <p className="text-[10px] text-slate-500">Foodcourt Cloud Center</p>
-                <p className="text-[9px] text-slate-400">Telp: {activeTenant?.hp}</p>
+                <p className="text-[10px] opacity-70">Foodcourt Cloud Center</p>
+                <p className="text-[9px] opacity-60">Telp: {activeTenant?.hp}</p>
               </div>
 
               {/* Meta */}
-              <div className="space-y-1 mb-4 text-[10px] border-b border-slate-100 pb-2">
+              <div className="space-y-1 mb-4 text-[10px] border-b border-current/20 pb-2">
                 <div className="flex justify-between">
                   <span>No. Order:</span>
                   <span className="font-bold">{receiptTx.id}</span>
@@ -562,11 +600,8 @@ export default function TenantCashier() {
                   <span>Tanggal:</span>
                   <span>
                     {new Date(receiptTx.date).toLocaleDateString("id-ID", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit"
+                      day: "2-digit", month: "short", year: "numeric",
+                      hour: "2-digit", minute: "2-digit"
                     })}
                   </span>
                 </div>
@@ -577,14 +612,14 @@ export default function TenantCashier() {
               </div>
 
               {/* Items List */}
-              <div className="space-y-2 mb-4 border-b border-dashed border-slate-300 pb-3">
-                {receiptTx.items.map((item: any) => (
+              <div className="space-y-2 mb-4 border-b border-dashed border-current/30 pb-3">
+                {receiptTx.items.map((item) => (
                   <div key={item.name} className="space-y-0.5">
                     <div className="flex justify-between font-semibold">
                       <span>{item.name}</span>
                       <span>{formatRupiah(item.total)}</span>
                     </div>
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-[10px] opacity-70">
                       {item.qty} x {formatRupiah(item.harga)}
                     </div>
                   </div>
@@ -592,21 +627,21 @@ export default function TenantCashier() {
               </div>
 
               {/* Calculation Totals */}
-              <div className="space-y-1.5 mb-6 text-right">
-                <div className="flex justify-between font-bold text-sm">
+              <div className="space-y-1.5 mb-5 text-right">
+                <div className="flex justify-between font-extrabold text-sm">
                   <span>TOTAL</span>
                   <span>{formatRupiah(receiptTx.total)}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between opacity-70 text-[10px]">
                   <span>Metode Pembayaran:</span>
                   <span>{receiptTx.paymentMethod}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between opacity-70 text-[10px]">
                   <span>Bayar:</span>
                   <span>{formatRupiah(receiptTx.cashPaid)}</span>
                 </div>
                 {receiptTx.paymentMethod === "Cash" && (
-                  <div className="flex justify-between text-slate-900 font-bold border-t border-slate-100 pt-1">
+                  <div className="flex justify-between font-extrabold border-t border-current/30 pt-1">
                     <span>Kembalian:</span>
                     <span>{formatRupiah(receiptTx.change)}</span>
                   </div>
@@ -614,18 +649,18 @@ export default function TenantCashier() {
               </div>
 
               {/* Receipt Footer */}
-              <div className="text-center text-[10px] text-slate-500 space-y-3">
+              <div className="text-center text-[10px] opacity-70 space-y-3">
                 <p>Terima kasih atas kunjungan Anda!</p>
-                <div className="border-t border-slate-200 pt-3 flex justify-center gap-2">
-                  <button 
+                <div className="border-t border-current/20 pt-3 flex justify-center gap-2">
+                  <button
                     onClick={() => { window.print(); }}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded flex items-center gap-1 text-[9px] transition-all"
+                    className="bg-foreground text-background font-bold py-1.5 px-3 rounded flex items-center gap-1 text-[9px] transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Cetak Fisik
                   </button>
-                  <button 
+                  <button
                     onClick={() => setIsReceiptOpen(false)}
-                    className="border border-slate-300 hover:bg-slate-100 font-bold py-1.5 px-3 rounded text-[9px] transition-all"
+                    className="border border-current/30 font-bold py-1.5 px-3 rounded text-[9px] transition-colors hover:bg-foreground/10"
                   >
                     Tutup Struk
                   </button>
@@ -639,107 +674,105 @@ export default function TenantCashier() {
         {/* MIDTRANS MOCK SNAP MODAL */}
         {isMockSnapOpen && mockSnapDetails && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setIsMockSnapOpen(false)} />
-            
-            <div className="relative w-full max-w-sm bg-[#fafafa] text-slate-800 rounded-2xl shadow-2xl z-10 animate-scale-up border border-slate-200/50 flex flex-col overflow-hidden">
+            <div className="fixed inset-0 bg-foreground/50" onClick={() => setIsMockSnapOpen(false)} />
+
+            <div className="relative w-full max-w-sm bg-card text-foreground rounded-md shadow-2xl z-10 border border-border flex flex-col overflow-hidden">
               {/* Snap Modal Header */}
-              <div className="bg-indigo-600 text-white px-4 py-3 flex items-center justify-between">
+              <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-cyan-300" />
-                  <span className="font-extrabold text-sm tracking-tight">Midtrans Snap <span className="text-[9px] bg-slate-900/40 text-cyan-200 px-1.5 py-0.5 rounded font-mono">SANDBOX</span></span>
+                  <Shield className="w-4 h-4" />
+                  <span className="font-extrabold text-sm tracking-tight">Midtrans Snap <span className="text-[9px] bg-foreground/30 px-1.5 py-0.5 rounded font-mono">SANDBOX</span></span>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsMockSnapOpen(false)}
-                  className="text-slate-200 hover:text-white transition-colors"
+                  className="opacity-80 hover:opacity-100 transition-opacity"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Order Info & Amount */}
-              <div className="bg-white border-b border-slate-100 p-4 flex justify-between items-center text-xs">
+              <div className="bg-muted border-b border-border p-4 flex justify-between items-center text-xs">
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-bold">Merchant</p>
-                  <p className="font-bold text-slate-700">{activeTenant?.nama_tenant}</p>
-                  <p className="text-[9px] text-indigo-500 font-mono mt-0.5">{mockSnapDetails.orderId}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-extrabold">Merchant</p>
+                  <p className="font-extrabold text-foreground">{activeTenant?.nama_tenant}</p>
+                  <p className="text-[9px] text-primary font-mono mt-0.5">{mockSnapDetails.orderId}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold">Total Pembayaran</p>
-                  <p className="font-extrabold text-indigo-600 text-sm">{formatRupiah(mockSnapDetails.total)}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-extrabold">Total Bayar</p>
+                  <p className="font-extrabold text-primary text-sm">{formatRupiah(mockSnapDetails.total)}</p>
                 </div>
               </div>
 
               {/* Payment Methods Tabs */}
               <div className="p-4 flex-1 space-y-4">
-                <div className="flex bg-slate-200/60 p-1 rounded-xl text-[10px] font-bold">
-                  <button 
+                <div className="flex bg-muted p-1 rounded-md text-[10px] font-extrabold">
+                  <button
                     type="button"
                     onClick={() => setMockSnapPaymentType("qris")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 ${mockSnapPaymentType === "qris" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                    className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center gap-1 ${mockSnapPaymentType === "qris" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     <QrCode className="w-3.5 h-3.5" /> Gopay / QRIS
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setMockSnapPaymentType("va")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 ${mockSnapPaymentType === "va" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                    className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center gap-1 ${mockSnapPaymentType === "va" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     <CreditCard className="w-3.5 h-3.5" /> Virtual Account
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setMockSnapPaymentType("cc")}
-                    className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 ${mockSnapPaymentType === "cc" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                    className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center gap-1 ${mockSnapPaymentType === "cc" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     <Lock className="w-3.5 h-3.5" /> Kartu Kredit
                   </button>
                 </div>
 
                 {/* Tab Contents */}
-                <div className="bg-white border border-slate-100 rounded-xl p-4 min-h-[160px] flex flex-col justify-center items-center text-xs">
+                <div className="bg-card border border-border rounded p-4 min-h-[160px] flex flex-col justify-center items-center text-xs">
                   {mockSnapPaymentType === "qris" && (
                     <div className="text-center space-y-3 flex flex-col items-center w-full">
-                      {/* Simulated QR Code */}
-                      <div className="w-28 h-28 border-4 border-slate-900 rounded-lg p-2 bg-white flex flex-col justify-between items-center relative shadow-sm">
+                      <div className="w-28 h-28 border-4 border-foreground rounded-md p-2 bg-card flex flex-col justify-between items-center relative">
                         <div className="grid grid-cols-4 gap-1.5 w-full h-full opacity-90">
                           {Array.from({ length: 16 }).map((_, i) => (
-                            <div 
-                              key={i} 
-                              className={`rounded-sm ${(i % 3 === 0 || i % 4 === 1 || i === 0 || i === 3 || i === 12 || i === 15) ? "bg-slate-900" : "bg-transparent"}`} 
+                            <div
+                              key={i}
+                              className={`rounded-sm ${(i % 3 === 0 || i % 4 === 1 || i === 0 || i === 3 || i === 12 || i === 15) ? "bg-foreground" : "bg-transparent"}`}
                             />
                           ))}
                         </div>
-                        {/* Middle GoPay logo container */}
-                        <div className="absolute inset-0 m-auto w-7 h-7 bg-indigo-600 rounded-md border-2 border-white flex items-center justify-center text-[8px] font-bold text-white uppercase shadow-sm">
+                        <div className="absolute inset-0 m-auto w-7 h-7 bg-primary rounded-sm border-2 border-card flex items-center justify-center text-[8px] font-extrabold text-primary-foreground uppercase">
                           Gpy
                         </div>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-medium text-center">Pindai kode QR di atas menggunakan GoPay, OVO, LinkAja, Dana, atau BCA Mobile.</p>
+                      <p className="text-[10px] text-muted-foreground font-medium text-center">Pindai QR pakai GoPay, OVO, DANA, ShopeePay, atau BCA Mobile.</p>
                     </div>
                   )}
 
                   {mockSnapPaymentType === "va" && (
                     <div className="w-full space-y-3 text-left">
-                      <div className="border-b pb-2 flex justify-between items-center">
-                        <span className="font-bold text-slate-700">Bank Transfer BCA</span>
-                        <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">Dicek Otomatis</span>
+                      <div className="border-b border-border pb-2 flex justify-between items-center">
+                        <span className="font-extrabold text-foreground">Bank Transfer BCA</span>
+                        <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-extrabold">Dicek Otomatis</span>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Nomor Virtual Account</p>
-                        <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border">
-                          <span className="font-mono font-bold text-indigo-600 tracking-wider">390108123456789</span>
-                          <button 
+                        <p className="text-[9px] text-muted-foreground font-extrabold uppercase">Nomor Virtual Account</p>
+                        <div className="flex justify-between items-center bg-muted p-2 rounded border border-border">
+                          <span className="font-mono font-extrabold text-primary tracking-wider">390108123456789</span>
+                          <button
                             type="button"
-                            onClick={() => alert("Nomor VA berhasil disalin!")}
-                            className="text-[10px] text-slate-500 hover:text-indigo-600 font-bold font-sans"
+                            onClick={() => alert("Nomor VA disalin!")}
+                            className="text-[10px] text-muted-foreground hover:text-primary font-extrabold font-sans"
                           >
                             Salin
                           </button>
                         </div>
                       </div>
-                      <ol className="list-decimal list-inside text-[9px] text-slate-400 space-y-0.5">
+                      <ol className="list-decimal list-inside text-[9px] text-muted-foreground space-y-0.5">
                         <li>Pilih Transfer &gt; BCA Virtual Account.</li>
-                        <li>Masukkan nomor virtual account di atas.</li>
+                        <li>Masukkan nomor VA di atas.</li>
                         <li>Konfirmasi nominal dan selesaikan pembayaran.</li>
                       </ol>
                     </div>
@@ -748,31 +781,31 @@ export default function TenantCashier() {
                   {mockSnapPaymentType === "cc" && (
                     <div className="w-full space-y-2 text-left">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Nomor Kartu Kredit</label>
-                        <input 
-                          type="text" 
-                          placeholder="4111 1111 1111 1111" 
-                          className="w-full bg-slate-50 border rounded-lg p-2 text-xs font-mono tracking-wider focus:outline-none focus:border-indigo-500" 
-                          disabled 
+                        <label className="text-[9px] font-extrabold text-muted-foreground uppercase">Nomor Kartu Kredit</label>
+                        <input
+                          type="text"
+                          placeholder="4111 1111 1111 1111"
+                          className="w-full bg-muted border border-border rounded p-2 text-xs font-mono tracking-wider focus:outline-none focus:border-primary"
+                          disabled
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">Valid Thru</label>
-                          <input 
-                            type="text" 
-                            placeholder="12/28" 
-                            className="w-full bg-slate-50 border rounded-lg p-2 text-xs focus:outline-none" 
-                            disabled 
+                          <label className="text-[9px] font-extrabold text-muted-foreground uppercase">Valid Thru</label>
+                          <input
+                            type="text"
+                            placeholder="12/28"
+                            className="w-full bg-muted border border-border rounded p-2 text-xs focus:outline-none"
+                            disabled
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">CVV</label>
-                          <input 
-                            type="text" 
-                            placeholder="123" 
-                            className="w-full bg-slate-50 border rounded-lg p-2 text-xs focus:outline-none" 
-                            disabled 
+                          <label className="text-[9px] font-extrabold text-muted-foreground uppercase">CVV</label>
+                          <input
+                            type="text"
+                            placeholder="123"
+                            className="w-full bg-muted border border-border rounded p-2 text-xs focus:outline-none"
+                            disabled
                           />
                         </div>
                       </div>
@@ -782,11 +815,11 @@ export default function TenantCashier() {
               </div>
 
               {/* Bottom Buttons */}
-              <div className="bg-slate-50 px-4 py-3 border-t flex gap-2">
+              <div className="bg-muted px-4 py-3 border-t border-border flex gap-2">
                 <button
                   type="button"
                   onClick={() => setIsMockSnapOpen(false)}
-                  className="flex-1 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold py-2 rounded-xl text-xs transition-all"
+                  className="flex-1 border border-border hover:bg-card text-foreground font-extrabold py-2 rounded text-xs transition-colors"
                   disabled={mockProcessing}
                 >
                   Batal
@@ -798,9 +831,9 @@ export default function TenantCashier() {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     setMockProcessing(false);
                     setIsMockSnapOpen(false);
-                    await saveTransactionToLocal("Midtrans", mockSnapDetails.total, 0);
+                    await saveTransactionToLocal("Midtrans", mockSnapDetails?.total || 0, 0);
                   }}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-xl text-xs shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-1 transition-all"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-2 rounded text-xs flex items-center justify-center gap-1 transition-colors"
                   disabled={mockProcessing}
                 >
                   {mockProcessing ? (
@@ -815,7 +848,7 @@ export default function TenantCashier() {
               </div>
 
               {/* Secure badge */}
-              <div className="bg-slate-100 py-1.5 text-center text-[8px] text-slate-400 font-bold uppercase tracking-widest border-t border-slate-200/50 flex items-center justify-center gap-1">
+              <div className="bg-muted py-1.5 text-center text-[8px] text-muted-foreground font-extrabold uppercase tracking-widest border-t border-border flex items-center justify-center gap-1">
                 <Lock className="w-2.5 h-2.5" /> Secured by Midtrans Encryption
               </div>
             </div>

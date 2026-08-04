@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Bricolage_Grotesque } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -7,11 +7,19 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "CloudFood - Sistem Informasi Berbasis Cloud Efisien, Akurat, dan Mudah Digunakan",
-  description: "Platform sistem informasi cloud untuk foodcourt yang efisien, akurat, dan mudah digunakan bagi admin dan tenant.",
+  title: "Plaza Oleos Food Court — Sistem Kasir CloudFood",
+  description: "Sistem kasir & laporan penjualan online untuk seluruh stan di Plaza Oleos Food Court, Lantai 2.",
 };
 
 export default function RootLayout({
@@ -20,9 +28,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${plusJakartaSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full bg-background text-foreground selection:bg-indigo-500 selection:text-white">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <html lang="id" className={`${plusJakartaSans.variable} ${bricolage.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
       </body>

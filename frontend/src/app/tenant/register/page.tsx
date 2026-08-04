@@ -1,14 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Store, Lock, User as UserIcon, Mail, Phone, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { dbSimulator } from "@/services/dbSimulator";
 import ThemeToggle from "@/components/ThemeToggle";
+import { clearAllSession } from "@/lib/session";
 
 export default function TenantRegisterPage() {
   const router = useRouter();
+  
+  useEffect(() => {
+    dbSimulator.logout().catch(() => {});
+    clearAllSession();
+  }, []);
   const [ownerName, setOwnerName] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [hp, setHp] = useState("");
@@ -112,7 +118,7 @@ export default function TenantRegisterPage() {
               <Store className="w-6 h-6" />
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Daftar Tenant Baru</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Daftarkan outlet kuliner Anda ke sistem CloudFood</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Daftarkan outlet kuliner Anda ke Plaza Oleos Food Court</p>
           </div>
 
           {/* Feedback Alerts */}

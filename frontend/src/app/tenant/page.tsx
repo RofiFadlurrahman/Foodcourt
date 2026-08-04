@@ -4,9 +4,10 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Tenant, Transaction } from "@/services/dbSimulator";
-import { 
-  TrendingUp, ReceiptText, UtensilsCrossed, Calendar, 
-  DollarSign, ShoppingBag, Sparkles, Activity, CreditCard
+import { getSessionTenant } from "@/lib/session";
+import {
+  ReceiptText, UtensilsCrossed, Calendar,
+  DollarSign, ShoppingBag, Sparkles, Activity, Soup
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -16,25 +17,19 @@ import {
 export default function TenantDashboard() {
   const router = useRouter();
   const [activeTenant, setActiveTenant] = useState<Tenant | null>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof dbSimulator.getTenantStats>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       
-      const sessionTenantStr = localStorage.getItem("session_tenant");
-      if (!sessionTenantStr) return;
-      const tenantObj = JSON.parse(sessionTenantStr) as Tenant;
-      setActiveTenant(tenantObj);
+      const sessionTenant = getSessionTenant<Tenant>();
+      if (!sessionTenant) return;
+      setActiveTenant(sessionTenant);
 
-      const tenantStats = await dbSimulator.getTenantStats(tenantObj.id);
+      const tenantStats = await dbSimulator.getTenantStats(sessionTenant.id);
       setStats(tenantStats);
     } catch (e) {
       console.error(e);
@@ -42,6 +37,11 @@ export default function TenantDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setTimeout(() => setIsMounted(true), 0);
+    void Promise.resolve().then(fetchData);
+  }, []);
 
   const formatRupiah = (value: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -54,21 +54,21 @@ export default function TenantDashboard() {
   return (
     <DashboardLayout roleRequired="tenant">
       <div className="space-y-6">
-        
+
         {/* Welcome Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-              Halo, {activeTenant?.nama_pemilik} <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+            <h1 className="font-display text-2xl font-extrabold tracking-tight flex items-center gap-2 text-foreground">
+              Halo, {activeTenant?.nama_pemilik} <Soup className="w-5 h-5 text-primary" />
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm">Selamat datang di Panel Outlet <b className="text-slate-700 dark:text-slate-300 font-bold">{activeTenant?.nama_tenant}</b>. Pantau penjualan real-time Anda.</p>
+            <p className="text-muted-foreground text-xs sm:text-sm">Selamat datang di Panel Stan <b className="text-foreground font-extrabold">{activeTenant?.nama_tenant}</b>. Pantau penjualan stan kamu.</p>
           </div>
-          
-          <button 
-            onClick={fetchData} 
-            className="self-start sm:self-auto bg-white hover:bg-slate-100 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/85 dark:text-slate-100 border border-slate-200 dark:border-slate-800 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+
+          <button
+            onClick={fetchData}
+            className="self-start sm:self-auto bg-card hover:bg-muted text-foreground border border-border text-xs font-extrabold py-2.5 px-4 rounded-md transition-colors flex items-center gap-1.5"
           >
-            <Activity className="w-3.5 h-3.5 text-indigo-500 animate-spin" style={{ animationDuration: "3s" }} /> Segarkan
+            <Activity className="w-3.5 h-3.5 text-primary animate-spin" style={{ animationDuration: "3s" }} /> Segarkan
           </button>
         </div>
 
@@ -76,159 +76,143 @@ export default function TenantDashboard() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-28 bg-slate-800 rounded-2xl" />
+                <div key={i} className="h-28 bg-card border border-border rounded-md" />
               ))}
             </div>
-            <div className="h-72 bg-slate-800 rounded-2xl animate-pulse" />
+            <div className="h-72 bg-card border border-border rounded-md animate-pulse" />
           </div>
         ) : (
           <>
             {/* STAT CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              {/* Revenue Today */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Pendapatan Hari Ini</span>
-                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+
+              <div className="bg-card border border-border rounded-md p-5 hover:border-primary transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Pendapatan Hari Ini</span>
+                  <div className="p-2 rounded-md bg-primary/10 text-primary">
                     <Calendar className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
                     {formatRupiah(stats?.revenueToday || 0)}
                   </h3>
-                  <span className="text-[10px] text-slate-400 block mt-1">Update otomatis tiap detik</span>
+                  <span className="text-[10px] text-muted-foreground block mt-1">Update tiap beberapa detik</span>
                 </div>
               </div>
 
-              {/* Revenue Month */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Pendapatan Bulan Ini</span>
-                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-secondary transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Pendapatan Bulan Ini</span>
+                  <div className="p-2 rounded-md bg-secondary/15 text-secondary">
                     <DollarSign className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
                     {formatRupiah(stats?.revenueThisMonth || 0)}
                   </h3>
-                  <span className="text-[10px] text-emerald-500 font-semibold block mt-1">▲ +8.2% vs Bulan Lalu</span>
+                  <span className="text-[10px] text-success font-extrabold block mt-1">▲ vs bulan lalu</span>
                 </div>
               </div>
 
-              {/* Total Transactions */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Total Penjualan</span>
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-accent transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Total Penjualan</span>
+                  <div className="p-2 rounded-md bg-accent/15 text-accent">
                     <ShoppingBag className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
                     {stats?.totalSalesCount || 0} Transaksi
                   </h3>
-                  <span className="text-[10px] text-slate-400 block mt-1">Total pesanan terproses</span>
+                  <span className="text-[10px] text-muted-foreground block mt-1">Total pesanan terproses</span>
                 </div>
               </div>
 
-              {/* Top Menu */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Menu Terlaris</span>
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-warning transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Menu Terlaris</span>
+                  <div className="p-2 rounded-md bg-warning/15 text-warning">
                     <UtensilsCrossed className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-md sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white truncate">
-                    {stats?.bestSellerMenu || "Tidak Ada"}
+                  <h3 className="text-base sm:text-lg font-extrabold tracking-tight text-foreground truncate">
+                    {stats?.bestSellerMenu || "Belum ada"}
                   </h3>
-                  <span className="text-[10px] text-indigo-400 font-bold block mt-1">Hidangan Favorit Pelanggan</span>
+                  <span className="text-[10px] text-primary font-extrabold block mt-1">Favorit pelanggan</span>
                 </div>
               </div>
 
             </div>
 
             {/* CHART: REVENUE TREND (7 days) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Daily revenue Line Chart */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm lg:col-span-2">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/20 pb-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+              <div className="bg-card border border-border rounded-md p-5 lg:col-span-2">
+                <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Grafik Penjualan 7 Hari Terakhir</h4>
-                    <p className="text-[10px] text-slate-400">Statistik omzet harian outlet Anda.</p>
+                    <h4 className="font-display text-sm font-extrabold text-foreground">Grafik Penjualan 7 Hari</h4>
+                    <p className="text-[10px] text-muted-foreground">Omzet harian stan kamu.</p>
                   </div>
-                  <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2.5 py-0.5 rounded font-bold">Line Chart</span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2.5 py-0.5 rounded font-extrabold uppercase tracking-wider">Line</span>
                 </div>
-                
+
                 <div className="h-64">
                   {isMounted && (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={stats?.chartData || []}>
                         <defs>
                           <linearGradient id="colorTenantRevenue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#c2410c" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#c2410c" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.15} />
-                        <XAxis dataKey="tanggal" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis 
-                          stroke="#94a3b8" 
-                          fontSize={10} 
-                          tickLine={false}
-                          tickFormatter={(v) => `Rp ${v / 1000}k`}
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+                        <XAxis dataKey="tanggal" stroke="currentColor" opacity={0.5} fontSize={10} tickLine={false} />
+                        <YAxis stroke="currentColor" opacity={0.5} fontSize={10} tickLine={false} tickFormatter={(v) => `Rp ${v / 1000}k`} />
+                        <Tooltip
+                          formatter={(v: unknown) => [formatRupiah(Number(v ?? 0)), "Omzet"]}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "11px" }}
                         />
-                        <Tooltip 
-                          formatter={(v: any) => [formatRupiah(v), "Omzet"]}
-                          contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px" }}
-                          labelStyle={{ color: "#94a3b8", fontSize: "11px", fontWeight: "bold" }}
-                          itemStyle={{ color: "#fff", fontSize: "11px" }}
-                        />
-                        <Area type="monotone" dataKey="pendapatan" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorTenantRevenue)" />
+                        <Area type="monotone" dataKey="pendapatan" stroke="#c2410c" strokeWidth={2.5} fillOpacity={1} fill="url(#colorTenantRevenue)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
                 </div>
               </div>
 
-              {/* Recent Transactions List (max 5) */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+              <div className="bg-card border border-border rounded-md p-5 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">Transaksi Terkini</h4>
-                  <p className="text-[10px] text-slate-400 border-b border-slate-100 dark:border-slate-800/20 pb-3 mb-3">5 Order terbaru dari outlet Anda.</p>
-                  
+                  <h4 className="font-display text-sm font-extrabold text-foreground">Transaksi Terkini</h4>
+                  <p className="text-[10px] text-muted-foreground border-b border-border pb-3 mb-3">5 order terbaru stan kamu.</p>
+
                   <div className="space-y-3.5">
                     {(stats?.recentTransactions || []).map((tx: Transaction) => (
                       <div key={tx.id} className="flex justify-between items-center text-xs">
                         <div>
-                          <span className="font-bold text-slate-900 dark:text-white block font-mono">{tx.id}</span>
-                          <span className="text-[10px] text-slate-500">
-                            {new Date(tx.tanggal_transaksi).toLocaleTimeString("id-ID", {
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            })} - {tx.metode_pembayaran}
+                          <span className="font-extrabold text-foreground block font-mono">{tx.id}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(tx.tanggal_transaksi).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} — {tx.metode_pembayaran}
                           </span>
                         </div>
-                        <span className="font-extrabold text-slate-900 dark:text-white">{formatRupiah(tx.total_harga)}</span>
+                        <span className="font-extrabold text-foreground">{formatRupiah(tx.total_harga)}</span>
                       </div>
                     ))}
                     {(!stats?.recentTransactions || stats.recentTransactions.length === 0) && (
-                      <div className="text-center py-10 text-slate-500">Belum ada transaksi hari ini</div>
+                      <div className="text-center py-10 text-muted-foreground text-xs">Belum ada transaksi hari ini</div>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/30">
-                  <button 
+                <div className="mt-4 pt-3 border-t border-border">
+                  <button
                     onClick={() => router.push("/tenant/cashier")}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-xl transition-all shadow-md shadow-indigo-600/10 flex items-center justify-center gap-1 hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-2.5 rounded-md transition-colors flex items-center justify-center gap-1.5"
                   >
-                    Buka Mesin Kasir (POS)
+                    Buka Mesin Kasir
                   </button>
                 </div>
               </div>

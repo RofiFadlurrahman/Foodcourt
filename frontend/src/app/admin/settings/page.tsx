@@ -3,14 +3,11 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, User } from "@/services/dbSimulator";
+import { getSessionUser, setSessionUser } from "@/lib/session";
 import { Settings, Cloud, UploadCloud, DownloadCloud, Save, User as UserIcon, Lock, Globe, Palette, Bell, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 export default function AdminSettings() {
-  const initialSessionUser = (() => {
-    if (typeof window === "undefined") return null;
-    const sessionUserStr = localStorage.getItem("session_user");
-    return sessionUserStr ? (JSON.parse(sessionUserStr) as User) : null;
-  })();
+  const initialSessionUser = getSessionUser<User>();
 
   const initialThemeMode = (() => {
     if (typeof window === "undefined") return "dark";
@@ -73,7 +70,7 @@ export default function AdminSettings() {
       };
 
       await dbSimulator.saveUser(updatedUser);
-      localStorage.setItem("session_user", JSON.stringify(updatedUser));
+      setSessionUser(updatedUser);
       setUser(updatedUser);
       showToast("Profil admin berhasil diperbarui.");
     } catch (e) {
@@ -129,7 +126,7 @@ export default function AdminSettings() {
       const href = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = href;
-      link.download = `CloudFood_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `PlazaOleos_Backup_${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction } from "@/services/dbSimulator";
-import { ReceiptText, Store, DollarSign, ArrowUpRight, Calendar, Activity } from "lucide-react";
+import { ReceiptText, Store, DollarSign, ArrowUpRight, Calendar, Activity, TrendingUp, Wallet } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 
-// Colors for Recharts pie cells
-const COLORS = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"];
+// Warm food court palette for charts
+const COLORS = ["#c2410c", "#a16207", "#15803d", "#7c2d12", "#b45309"];
 
 type AdminStats = Awaited<ReturnType<typeof dbSimulator.getAdminStats>>;
 
@@ -61,113 +61,107 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Dashboard Analitik Pengelola</h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Ringkasan real-time aktivitas transaksi, data tenant, dan penjualan cloud.</p>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">Dashboard Pengelola</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">Ringkasan transaksi & omzet seluruh stan foodcourt.</p>
           </div>
 
           <button
             onClick={fetchData}
-            className="self-start sm:self-auto bg-white hover:bg-slate-100 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/80 dark:text-slate-100 border border-slate-200 dark:border-slate-800 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+            className="self-start sm:self-auto bg-card hover:bg-muted text-foreground border border-border text-xs font-bold py-2.5 px-4 rounded-md transition-colors flex items-center gap-1.5"
           >
-            <Activity className="w-3.5 h-3.5 text-indigo-500 animate-spin" style={{ animationDuration: "3s" }} /> Segarkan Data
+            <Activity className="w-3.5 h-3.5 text-primary animate-spin" style={{ animationDuration: "3s" }} /> Segarkan Data
           </button>
         </div>
 
         {loading ? (
-          // Skeleton loader for cards & grid
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-28 bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-4 animate-pulse flex flex-col justify-between">
-                  <div className="w-12 h-4 bg-slate-200 dark:bg-slate-800 rounded" />
-                  <div className="w-24 h-8 bg-slate-200 dark:bg-slate-800 rounded mt-2" />
+                <div key={i} className="h-28 bg-card border border-border rounded-md p-4 animate-pulse flex flex-col justify-between">
+                  <div className="w-12 h-4 bg-muted rounded" />
+                  <div className="w-24 h-8 bg-muted rounded mt-2" />
                 </div>
               ))}
             </div>
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="h-72 bg-white dark:bg-[#0d1222] rounded-2xl animate-pulse" />
-              <div className="h-72 bg-white dark:bg-[#0d1222] rounded-2xl animate-pulse" />
+            <div className="grid lg:grid-cols-2 gap-5">
+              <div className="h-72 bg-card border border-border rounded-md animate-pulse" />
+              <div className="h-72 bg-card border border-border rounded-md animate-pulse" />
             </div>
           </div>
         ) : (
           <>
             {/* 1. STATISTIC CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Card 1 */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Total Pendapatan</span>
-                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-primary transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Total Pendapatan</span>
+                  <div className="p-2 rounded-md bg-primary/10 text-primary">
                     <DollarSign className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{formatRupiah(stats?.totalRevenue || 0)}</h3>
-                  <p className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1 mt-1">
-                    <span>▲ +14.2%</span> <span className="text-slate-400">dari minggu lalu</span>
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{formatRupiah(stats?.totalRevenue || 0)}</h3>
+                  <p className="text-[10px] text-success font-bold flex items-center gap-1 mt-1">
+                    <span>▲ +14.2%</span> <span className="text-muted-foreground">dari minggu lalu</span>
                   </p>
                 </div>
               </div>
 
-              {/* Card 2 */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Pendapatan Hari Ini</span>
-                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-secondary transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Pendapatan Hari Ini</span>
+                  <div className="p-2 rounded-md bg-secondary/15 text-secondary">
                     <Calendar className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{formatRupiah(stats?.revenueToday || 0)}</h3>
-                  <p className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1 mt-1">
-                    <span>▲ +8.5%</span> <span className="text-slate-400">dari kemarin</span>
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{formatRupiah(stats?.revenueToday || 0)}</h3>
+                  <p className="text-[10px] text-success font-bold flex items-center gap-1 mt-1">
+                    <span>▲ +8.5%</span> <span className="text-muted-foreground">dari kemarin</span>
                   </p>
                 </div>
               </div>
 
-              {/* Card 3 */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Transaksi Cloud</span>
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-accent transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Total Order</span>
+                  <div className="p-2 rounded-md bg-accent/15 text-accent">
                     <ReceiptText className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{stats?.totalTransactions || 0} Order</h3>
-                  <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-1">
-                    <span>Tersebar di {stats?.totalTenants || 0} Tenant</span>
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{stats?.totalTransactions || 0} Order</h3>
+                  <p className="text-[10px] text-muted-foreground font-bold flex items-center gap-1 mt-1">
+                    <span>Dari {stats?.totalTenants || 0} stan aktif</span>
                   </p>
                 </div>
               </div>
 
-              {/* Card 4 */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Tenant Aktif</span>
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <div className="bg-card border border-border rounded-md p-5 hover:border-warning transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider">Stan Aktif</span>
+                  <div className="p-2 rounded-md bg-warning/15 text-warning">
                     <Store className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{stats?.totalTenants || 0} Outlet</h3>
-                  <p className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1 mt-1">
-                    <span>Uptime 99.9% Cloud Sync</span>
+                  <h3 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{stats?.totalTenants || 0} Stan</h3>
+                  <p className="text-[10px] text-success font-bold flex items-center gap-1 mt-1">
+                    <span>Semua stan online</span>
                   </p>
                 </div>
               </div>
             </div>
 
             {/* 2. MAIN CHARTS SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Line Chart - Pendapatan 7 Hari */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="bg-card border border-border rounded-md p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Tren Pendapatan Harian</h4>
-                    <p className="text-[10px] text-slate-400">Fluktuasi omzet foodcourt 7 hari terakhir.</p>
+                    <h4 className="font-display text-sm font-extrabold text-foreground">Tren Pendapatan 7 Hari</h4>
+                    <p className="text-[10px] text-muted-foreground">Omzet foodcourt minggu ini.</p>
                   </div>
-                  <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded font-semibold">Line Chart</span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-extrabold uppercase tracking-wider">Line</span>
                 </div>
                 <div className="h-64">
                   {isMounted && (
@@ -175,52 +169,47 @@ export default function AdminDashboard() {
                       <AreaChart data={stats?.lineChartData || []}>
                         <defs>
                           <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#c2410c" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#c2410c" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.2} />
-                        <XAxis dataKey="tanggal" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={(v) => `Rp ${v / 1000}k`} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+                        <XAxis dataKey="tanggal" stroke="currentColor" opacity={0.5} fontSize={10} tickLine={false} />
+                        <YAxis stroke="currentColor" opacity={0.5} fontSize={10} tickLine={false} tickFormatter={(v) => `Rp ${v / 1000}k`} />
                         <Tooltip
                           formatter={(value) => [formatRupiah(Number(value)), "Pendapatan"]}
-                          contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px" }}
-                          labelStyle={{ color: "#94a3b8", fontSize: "11px", fontWeight: "bold" }}
-                          itemStyle={{ color: "#fff", fontSize: "11px" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "11px" }}
                         />
-                        <Area type="monotone" dataKey="pendapatan" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
+                        <Area type="monotone" dataKey="pendapatan" stroke="#c2410c" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
                 </div>
               </div>
 
-              {/* Bar Chart - Performa Tenant */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
+              <div className="bg-card border border-border rounded-md p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Performa Pendapatan Tenant</h4>
-                    <p className="text-[10px] text-slate-400">Komparasi perolehan omzet masing-masing outlet.</p>
+                    <h4 className="font-display text-sm font-extrabold text-foreground">Performa Stan</h4>
+                    <p className="text-[10px] text-muted-foreground">Omzet masing-masing stan.</p>
                   </div>
-                  <span className="text-[10px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-semibold">Bar Chart</span>
+                  <span className="text-[10px] bg-secondary/15 text-secondary px-2 py-0.5 rounded font-extrabold uppercase tracking-wider">Bar</span>
                 </div>
                 <div className="h-64">
                   {isMounted && (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={stats?.barChartTenantPerformance || []}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.2} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={(v) => `Rp ${v / 1000}k`} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+                        <XAxis dataKey="name" stroke="currentColor" opacity={0.5} fontSize={9} tickLine={false} />
+                        <YAxis stroke="currentColor" opacity={0.5} fontSize={10} tickLine={false} tickFormatter={(v) => `Rp ${v / 1000}k`} />
                         <Tooltip
                           formatter={(value: string | number | readonly (string | number)[] | undefined) => {
                             const numericValue = Array.isArray(value) ? Number(value[0]) : Number(value ?? 0);
                             return [formatRupiah(numericValue), "Pendapatan"];
                           }}
-                          contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px" }}
-                          labelStyle={{ color: "#94a3b8", fontSize: "11px" }}
-                          itemStyle={{ color: "#fff", fontSize: "11px" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "11px" }}
                         />
-                        <Bar dataKey="pendapatan" fill="#06b6d4" radius={[4, 4, 0, 0]}>
+                        <Bar dataKey="pendapatan" fill="#a16207" radius={[4, 4, 0, 0]}>
                           {(stats?.barChartTenantPerformance || []).map((entry: TenantPerformanceData, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
@@ -232,12 +221,11 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Pie Chart - Menu Terlaris */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm lg:col-span-1 flex flex-col justify-between">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="bg-card border border-border rounded-md p-5 lg:col-span-1 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">5 Menu Terlaris</h4>
-                  <p className="text-[10px] text-slate-400 mb-4">Porsi menu terpopuler yang terjual.</p>
+                  <h4 className="font-display text-sm font-extrabold text-foreground">5 Menu Terlaris</h4>
+                  <p className="text-[10px] text-muted-foreground mb-4">Porsi terjual minggu ini.</p>
 
                   <div className="h-44 relative flex items-center justify-center">
                     {isMounted && (
@@ -248,7 +236,7 @@ export default function AdminDashboard() {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px" }} itemStyle={{ color: "#fff", fontSize: "11px" }} />
+                          <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "11px" }} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
@@ -258,24 +246,23 @@ export default function AdminDashboard() {
                 <div className="space-y-2 mt-4">
                   {(stats?.pieChartBestSellers || []).slice(0, 3).map((item: BestSellerData, idx: number) => (
                     <div key={item.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                      <div className="flex items-center gap-2 text-foreground/80">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                        <span className="font-medium truncate max-w-[120px]">{item.name}</span>
+                        <span className="font-semibold truncate max-w-[120px]">{item.name}</span>
                       </div>
-                      <span className="font-bold text-slate-900 dark:text-white">{item.value} porsi</span>
+                      <span className="font-extrabold text-foreground">{item.value} porsi</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Recent Transactions Table */}
-              <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm lg:col-span-2">
+              <div className="bg-card border border-border rounded-md p-5 lg:col-span-2">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Transaksi Terbaru</h4>
-                    <p className="text-[10px] text-slate-400">Daftar penjualan digital terbaru dari seluruh tenant.</p>
+                    <h4 className="font-display text-sm font-extrabold text-foreground">Transaksi Terbaru</h4>
+                    <p className="text-[10px] text-muted-foreground">Order terbaru dari seluruh stan.</p>
                   </div>
-                  <Link href="/admin/transactions" className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5">
+                  <Link href="/admin/transactions" className="text-xs font-extrabold text-primary hover:underline flex items-center gap-0.5">
                     Semua Transaksi <ArrowUpRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -283,61 +270,44 @@ export default function AdminDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider font-bold">
+                      <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-extrabold">
                         <th className="py-2.5">ID Order</th>
                         <th className="py-2.5">Menu</th>
                         <th className="py-2.5">Jumlah</th>
-                        <th className="py-2.5">Total Harga</th>
-                        <th className="py-2.5">Metode</th>
-                        <th className="py-2.5 text-right">Tanggal</th>
+                        <th className="py-2.5">Total</th>
+                        <th className="py-2.5">Bayar</th>
+                        <th className="py-2.5 text-right">Waktu</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 text-slate-700 dark:text-slate-300">
+                    <tbody className="divide-y divide-border text-foreground/85">
                       {(stats?.recentTransactions || []).map((tx: Transaction) => (
-                        <tr key={tx.id} className="hover:bg-slate-100/50 dark:hover:bg-slate-800/10">
-                          <td className="py-3 font-bold text-slate-900 dark:text-white">{tx.id}</td>
-                          <td className="py-3">
-                            <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              {/* Quick dynamic lookup if name is not embedded */}
-                              {tx.menu_id === "m-1"
-                                ? "Bakso Urat Spesial"
-                                : tx.menu_id === "m-2"
-                                  ? "Mie Ayam Pangsit Bakso"
-                                  : tx.menu_id === "m-3"
-                                    ? "Es Teh Manis Segar"
-                                    : tx.menu_id === "m-4"
-                                      ? "Es Kopi Susu Senja"
-                                      : tx.menu_id === "m-5"
-                                        ? "Classic Chocolate Ice"
-                                        : tx.menu_id === "m-6"
-                                          ? "Roti Bakar Keju Meleleh"
-                                          : tx.menu_id === "m-7"
-                                            ? "Salmon Mentai Roll"
-                                            : tx.menu_id === "m-8"
-                                              ? "Chicken Katsu Curry"
-                                              : tx.menu_id === "m-9"
-                                                ? "Ocha Green Tea"
-                                                : "Menu Hidangan"}
-                            </span>
+                        <tr key={tx.id} className="hover:bg-muted/40">
+                          <td className="py-3 font-extrabold text-foreground">{tx.id}</td>
+                          <td className="py-3 font-semibold">
+                            {tx.menu_id === "m-1" ? "Bakso Urat Spesial"
+                              : tx.menu_id === "m-2" ? "Mie Ayam Pangsit Bakso"
+                              : tx.menu_id === "m-3" ? "Es Teh Manis Segar"
+                              : tx.menu_id === "m-4" ? "Es Kopi Susu Senja"
+                              : tx.menu_id === "m-5" ? "Classic Chocolate Ice"
+                              : tx.menu_id === "m-6" ? "Roti Bakar Keju Meleleh"
+                              : tx.menu_id === "m-7" ? "Salmon Mentai Roll"
+                              : tx.menu_id === "m-8" ? "Chicken Katsu Curry"
+                              : tx.menu_id === "m-9" ? "Ocha Green Tea"
+                              : "Menu Hidangan"}
                           </td>
                           <td className="py-3 font-semibold">{tx.jumlah}x</td>
-                          <td className="py-3 font-bold text-slate-900 dark:text-white">{formatRupiah(tx.total_harga)}</td>
+                          <td className="py-3 font-extrabold text-foreground">{formatRupiah(tx.total_harga)}</td>
                           <td className="py-3">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                tx.metode_pembayaran === "QRIS" ? "bg-cyan-500/10 text-cyan-400" : tx.metode_pembayaran === "Debit" ? "bg-indigo-500/10 text-indigo-400" : "bg-slate-500/10 text-slate-400"
-                              }`}
-                            >
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                              tx.metode_pembayaran === "QRIS" ? "bg-accent/15 text-accent"
+                              : tx.metode_pembayaran === "Debit" ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground"
+                            }`}>
                               {tx.metode_pembayaran}
                             </span>
                           </td>
-                          <td className="py-3 text-right text-slate-500">
-                            {new Date(tx.tanggal_transaksi).toLocaleDateString("id-ID", {
-                              day: "2-digit",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                          <td className="py-3 text-right text-muted-foreground">
+                            {new Date(tx.tanggal_transaksi).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </td>
                         </tr>
                       ))}

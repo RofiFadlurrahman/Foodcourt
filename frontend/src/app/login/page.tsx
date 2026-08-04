@@ -13,8 +13,8 @@ export default function LoginFallbackRedirect() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-2">
-      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      <span className="text-xs text-slate-500 font-semibold">Mengalihkan ke beranda...</span>
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs text-muted-foreground font-extrabold uppercase tracking-wider">Mengalihkan ke beranda...</span>
     </div>
   );
 }

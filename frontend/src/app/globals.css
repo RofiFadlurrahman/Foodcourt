@@ -3,104 +3,94 @@
 
 @layer base {
   :root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
-    
-    --card: #ffffff;
-    --card-foreground: #0f172a;
-    
-    --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    
-    --primary: #4f46e5;
-    --primary-foreground: #ffffff;
-    
-    --secondary: #06b6d4;
-    --secondary-foreground: #ffffff;
-    
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    
-    --accent: #f1f5f9;
-    --accent-foreground: #0f172a;
-    
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    
-    --warning: #f59e0b;
-    --warning-foreground: #ffffff;
-    
-    --success: #10b981;
-    --success-foreground: #ffffff;
+    /* Food court palette — warm cream, terracotta, kopi tua */
+    --background: #f4ede0;       /* kertas krem */
+    --foreground: #2a1810;       /* kopi tua */
 
-    --border: #e2e8f0;
-    --input: #e2e8f0;
-    --ring: #4f46e5;
-    
-    --radius: 1rem;
-    
-    --glass-bg: rgba(255, 255, 255, 0.45);
-    --glass-border: rgba(255, 255, 255, 0.25);
+    --card: #fffaf0;             /* kertas hangat */
+    --card-foreground: #2a1810;
 
-    /* Legibility overrides for slate text colors in light mode (WCAG AA/AAA compliant) */
-    --color-slate-500: #475569;
-    --color-slate-400: #64748b;
+    --popover: #fffaf0;
+    --popover-foreground: #2a1810;
+
+    --primary: #c2410c;          /* terracotta / saus sambal tua */
+    --primary-foreground: #fffaf0;
+
+    --secondary: #a16207;        /* kunyit / mustard tua */
+    --secondary-foreground: #fffaf0;
+
+    --muted: #ebe0c8;            /* krem gelap */
+    --muted-foreground: #7a6049; /* kopi medium */
+
+    --accent: #15803d;           /* daun pandan */
+    --accent-foreground: #fffaf0;
+
+    --destructive: #b91c1c;      /* cabe merah */
+    --destructive-foreground: #fffaf0;
+
+    --warning: #c2410c;          /* kunyit panas */
+    --warning-foreground: #fffaf0;
+
+    --success: #15803d;          /* daun segar */
+    --success-foreground: #fffaf0;
+
+    --border: #d6c5a0;           /* kertas tua */
+    --input: #e8dcc4;
+    --ring: #c2410c;
+
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: #060913;
-    --foreground: #f8fafc;
-    
-    --card: #0d1222;
-    --card-foreground: #f8fafc;
-    
-    --popover: #0d1222;
-    --popover-foreground: #f8fafc;
-    
-    --primary: #6366f1;
-    --primary-foreground: #ffffff;
-    
-    --secondary: #06b6d4;
-    --secondary-foreground: #0f172a;
-    
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    
-    --accent: #1e293b;
-    --accent-foreground: #f8fafc;
-    
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    
-    --warning: #f59e0b;
-    --warning-foreground: #0f172a;
-    
-    --success: #10b981;
-    --success-foreground: #0f172a;
+    --background: #1a1208;       /* kopi pekat */
+    --foreground: #f4ede0;
 
-    --border: #1e293b;
-    --input: #1e293b;
-    --ring: #6366f1;
-    
-    --glass-bg: rgba(13, 18, 34, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.08);
+    --card: #251808;             /* kayu gelap */
+    --card-foreground: #f4ede0;
 
-    /* Legibility overrides for slate text colors in dark mode (WCAG AA/AAA compliant) */
-    --color-slate-500: #94a3b8;
-    --color-slate-400: #cbd5e1;
+    --popover: #251808;
+    --popover-foreground: #f4ede0;
+
+    --primary: #fb923c;          /* gerobak malam */
+    --primary-foreground: #1a1208;
+
+    --secondary: #facc15;        /* kunyit neon */
+    --secondary-foreground: #1a1208;
+
+    --muted: #2d1d0e;
+    --muted-foreground: #c4a987;
+
+    --accent: #86efac;
+    --accent-foreground: #1a1208;
+
+    --destructive: #f87171;
+    --destructive-foreground: #1a1208;
+
+    --warning: #fbbf24;
+    --warning-foreground: #1a1208;
+
+    --success: #4ade80;
+    --success-foreground: #1a1208;
+
+    --border: #3a2818;
+    --input: #2a1a0d;
+    --ring: #fb923c;
   }
 
-  /* Base typography color fallback rules */
   h1, h2, h3, h4, h5, h6 {
     color: var(--foreground);
+    font-family: var(--font-display), var(--font-jakarta), system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
   .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-    color: #ffffff;
+    color: #f4ede0;
   }
 }
 
 @theme {
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-display: var(--font-bricolage), var(--font-jakarta), ui-sans-serif, system-ui;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -124,73 +114,196 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.875rem;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-jakarta), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-jakarta), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
+
+  /* Subtle paper grain — gives the "kertas" feel without going full texture */
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(122, 96, 73, 0.07) 1px, transparent 0);
+  background-size: 18px 18px;
 }
 
-/* Glassmorphism utility */
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
+.dark body {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(244, 237, 224, 0.04) 1px, transparent 0);
 }
 
-.glass-premium {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* ============== FOOD COURT UTILITIES ============== */
+
+/* Stamp — for "TERLARIS", "BARU" badges, slightly rotated */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border: 1.5px dashed currentColor;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+  background: transparent;
+}
+.stamp-solid {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
 }
 
-.dark .glass-premium {
-  background: linear-gradient(135deg, rgba(13, 18, 34, 0.6) 0%, rgba(6, 9, 19, 0.4) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* Price tag — warteg style */
+.price-tag {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.75rem;
+  position: relative;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%, 8px 50%);
+  padding-left: 0.85rem;
 }
 
-/* Glow effects */
-.glow-primary {
-  box-shadow: 0 0 40px -5px rgba(99, 102, 241, 0.2);
+/* Chalkboard — dark textured panel for menu previews */
+.chalkboard {
+  background: #1c3a2e;
+  color: #fef3c7;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px);
+  border: 6px solid #5c3a1e;
+  box-shadow:
+    inset 0 0 30px rgba(0,0,0,0.4),
+    0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 0.25rem;
+}
+.dark .chalkboard {
+  background: #0e2620;
+  border-color: #3a2818;
 }
 
-.glow-secondary {
-  box-shadow: 0 0 40px -5px rgba(6, 182, 212, 0.2);
+/* Receipt — paper strip style */
+.receipt {
+  background: #fffaf0;
+  color: #2a1810;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  position: relative;
+  filter: drop-shadow(0 2px 4px rgba(42, 24, 16, 0.15));
+}
+.receipt::before,
+.receipt::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background-image: radial-gradient(circle at 5px 0, transparent 5px, #fffaf0 5px);
+  background-size: 10px 10px;
+  background-position: 0 -5px;
+}
+.receipt::before { top: -5px; }
+.receipt::after { bottom: -5px; transform: rotate(180deg); }
+.dark .receipt {
+  background: #2a1a0d;
+  color: #f4ede0;
+}
+.dark .receipt::before,
+.dark .receipt::after {
+  background-image: radial-gradient(circle at 5px 0, transparent 5px, #2a1a0d 5px);
 }
 
-/* Scrollbar styling */
+/* Divider with central ornament */
+.divider-kuliner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.divider-kuliner::before,
+.divider-kuliner::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Card hover for tenant directory */
+.stall-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.stall-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 0 -4px rgba(194, 65, 12, 0.08);
+}
+
+/* Soft scrollbar in warm tone */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3);
+  background: rgba(194, 65, 12, 0.25);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.5);
+  background: rgba(194, 65, 12, 0.45);
 }
 
-/* Custom animations */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(0.98); }
+/* Underline hover — like hand-drawn menu */
+.menu-link {
+  position: relative;
+  font-weight: 600;
+}
+.menu-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+.menu-link:hover::after {
+  width: 100%;
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s infinite ease-in-out;
+/* Display headings */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
+
+/* Subtle animation for hover lifts */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(-4deg); }
+}
+.hover-wiggle:hover { animation: wiggle 0.4s ease-in-out; }
