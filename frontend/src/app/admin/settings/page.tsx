@@ -229,7 +229,7 @@ export default function AdminSettings() {
       try {
         setLoading(true);
         const textData = await file.text();
-        await dbSimulator.restoreBackup(textData);
+        await dbSimulator.importBackup(textData);
         alert("Restore Database Berhasil!\n\nHalaman akan dimuat ulang.");
         window.location.reload();
       } catch (err) {
