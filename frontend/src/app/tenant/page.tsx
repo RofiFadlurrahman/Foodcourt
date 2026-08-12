@@ -6,8 +6,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Tenant, Transaction } from "@/services/dbSimulator";
 import { getSessionTenant } from "@/lib/session";
 import {
-  ReceiptText, UtensilsCrossed, Calendar,
-  DollarSign, ShoppingBag, Sparkles, Activity, Soup
+  UtensilsCrossed, Calendar,
+  DollarSign, ShoppingBag, Activity, Soup
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -29,7 +29,7 @@ export default function TenantDashboard() {
       if (!sessionTenant) return;
       setActiveTenant(sessionTenant);
 
-      const tenantStats = await dbSimulator.getTenantStats(sessionTenant.id);
+      const tenantStats = await dbSimulator.getTenantStats();
       setStats(tenantStats);
     } catch (e) {
       console.error(e);

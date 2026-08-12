@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowRight, Soup, Coffee, UtensilsCrossed, Flame, Receipt, Bell,
-  ChevronDown, Quote, MapPin, Clock, Star, Store, ShieldCheck, Wallet,
-  Wifi, HelpCircle, ChefHat,
+  ArrowRight, Receipt, ChevronDown, Quote, MapPin, Clock, Star,
+  ChefHat, Wallet, Wifi, HelpCircle,
 } from "lucide-react";
 import { initDB } from "@/services/dbSimulator";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -153,7 +152,7 @@ export default function LandingPage() {
             </div>
 
             <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.05] mb-5 text-foreground">
-              Buku tulis, kalkulator, sama nota kertas — <span className="text-primary">bye.</span>
+              Buku tulis, kalkulator, sama nota kertas = <span className="text-primary">bye.</span>
             </h1>
 
             <p className="text-base md:text-lg text-muted-foreground max-w-2xl leading-relaxed mb-8">

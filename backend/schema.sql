@@ -6,6 +6,7 @@ USE `foodcourt_db`;
 DROP TABLE IF EXISTS `transactions`;
 DROP TABLE IF EXISTS `menus`;
 DROP TABLE IF EXISTS `tenants`;
+DROP TABLE IF EXISTS `tenant_invitations`;
 DROP TABLE IF EXISTS `users`;
 
 -- 3. PEMBUATAN TABEL
@@ -20,6 +21,18 @@ CREATE TABLE `users` (
     `avatar` VARCHAR(255) NULL,
     `created_by` INT NULL,
     FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tabel Tenant Invitations (Kode Undangan oleh Admin)
+CREATE TABLE `tenant_invitations` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `admin_id` INT NOT NULL,
+    `code` VARCHAR(20) NOT NULL UNIQUE,
+    `email` VARCHAR(100) NULL,
+    `status` ENUM('active','used','expired') NOT NULL DEFAULT 'active',
+    `expires_at` DATETIME NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Tabel Tenants (Profil Tenant Foodcourt)
@@ -103,8 +116,8 @@ INSERT INTO `transactions` (`tenant_id`, `menu_id`, `jumlah`, `total_harga`, `ta
 (1, 1, 2, 50000.00, DATE_SUB(NOW(), INTERVAL 4 HOUR), 'QRIS'),
 (1, 2, 1, 22000.00, DATE_SUB(NOW(), INTERVAL 3 HOUR), 'Cash'),
 -- Tenant 2
-(2, 3, 3, 54000.00, DATE_SUB(NOW(), INTERVAL 2 HOUR), 'Debit'),
-(2, 4, 2, 32000.00, DATE_SUB(NOW(), INTERVAL 1 HOUR), 'QRIS'),
+(2, 4, 3, 54000.00, DATE_SUB(NOW(), INTERVAL 2 HOUR), 'Debit'),
+(2, 5, 2, 32000.00, DATE_SUB(NOW(), INTERVAL 1 HOUR), 'QRIS'),
 -- Tenant 3
 (3, 7, 1, 45000.00, DATE_SUB(NOW(), INTERVAL 5 HOUR), 'Midtrans'),
 (3, 9, 2, 16000.00, DATE_SUB(NOW(), INTERVAL 2 HOUR), 'QRIS'),

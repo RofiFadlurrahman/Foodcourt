@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Soup, Lock, User as UserIcon, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft, ArrowRight, Loader2, Store } from "lucide-react";
+import { Lock, User as UserIcon, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft, ArrowRight, Loader2, Store } from "lucide-react";
 import { dbSimulator } from "@/services/dbSimulator";
 import ThemeToggle from "@/components/ThemeToggle";
 import { setSessionUser, setSessionTenant, clearAllSession } from "@/lib/session";
@@ -48,8 +48,8 @@ export default function TenantLoginPage() {
         setError("Username atau password salah.");
         setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan sistem. Coba lagi.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan sistem. Coba lagi.");
       setLoading(false);
     }
   };

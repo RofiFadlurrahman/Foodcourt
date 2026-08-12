@@ -3,33 +3,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction, Tenant, Menu } from "@/services/dbSimulator";
-import { LineChart as LineIcon, Calendar, Store, Filter, TrendingUp, Clock, Award, Users, RefreshCw } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { Calendar, Store, Filter, TrendingUp, Clock, Award, Users, RefreshCw } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 
 const COLORS = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#f43f5e"];
-
-type RevenueTrendData = {
-  tanggal: string;
-  pendapatan: number;
-};
-
-type TenantComparisonData = {
-  id: string;
-  name: string;
-  pendapatan: number;
-  transaksi: number;
-};
-
-type HourlyDistributionData = {
-  label: string;
-  hour: number;
-  transaksi: number;
-};
-
-type BestSellerData = {
-  name: string;
-  value: number;
-};
 
 export default function AnalyticsDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -154,22 +131,6 @@ export default function AnalyticsDashboard() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
   }, [filteredTransactions, menus]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const txs = await dbSimulator.getTransactions();
-      const tnts = await dbSimulator.getTenants();
-      const mns = await dbSimulator.getMenus();
-      setTransactions(txs);
-      setTenants(tnts);
-      setMenus(mns);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     const loadData = async () => {

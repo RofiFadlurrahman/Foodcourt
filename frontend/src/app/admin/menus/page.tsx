@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Menu, Tenant } from "@/services/dbSimulator";
-import { UtensilsCrossed, Plus, X, Save, CheckCircle, Search, Filter } from "lucide-react";
+import {
+  UtensilsCrossed, Plus, X, Save, CheckCircle, Search,
+  ImagePlus, Upload, Loader2
+} from "lucide-react";
 import AdminMenuCard from "@/components/AdminMenuCard";
 
 export default function AdminMenuManagement() {
@@ -26,7 +29,14 @@ export default function AdminMenuManagement() {
   const [stok, setStok] = useState(50);
   const [status, setStatus] = useState<"ready" | "empty">("ready");
   const [tenantId, setTenantId] = useState("");
-  const [foto, setFoto] = useState("");
+  const [foto, setFoto] = useState(""); // URL gambar yang sudah tersimpan
+
+  // ── State untuk upload gambar ──────────────────────────────────────────────
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");   // Object URL untuk preview
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // ──────────────────────────────────────────────────────────────────────────
 
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -49,9 +59,25 @@ export default function AdminMenuManagement() {
     void Promise.resolve().then(fetchData);
   }, []);
 
+  // Bersihkan object URL saat komponen unmount agar tidak memory leak
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  const resetImageState = () => {
+    if (previewUrl && previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleOpenAddModal = () => {
@@ -63,7 +89,8 @@ export default function AdminMenuManagement() {
     setStok(50);
     setStatus("ready");
     setTenantId(tenants[0]?.id || "");
-    setFoto("https://images.unsplash.com/photo-1529042410759-befb1204b468?auto=format&fit=crop&w=150&q=80");
+    setFoto("");
+    resetImageState();
     setIsModalOpen(true);
   };
 
@@ -77,7 +104,8 @@ export default function AdminMenuManagement() {
     setStok(m.stok);
     setStatus(m.status);
     setTenantId(m.tenant_id);
-    setFoto(m.foto);
+    setFoto(m.foto); // Gambar lama dari DB
+    resetImageState(); // Reset pilihan file baru
     setIsModalOpen(true);
   };
 
@@ -95,6 +123,38 @@ export default function AdminMenuManagement() {
     }
   };
 
+  // ── Handler pilih file ─────────────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi format di frontend
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setFormError("Format gambar tidak diizinkan. Gunakan JPG, JPEG, PNG, atau WEBP.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Validasi ukuran (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Ukuran gambar terlalu besar. Maksimal 5MB.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setFormError("");
+
+    // Revoke URL lama agar tidak memory leak
+    if (previewUrl && previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+
+    // Buat object URL untuk preview langsung
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setPreviewUrl(objectUrl);
+  };
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -106,6 +166,31 @@ export default function AdminMenuManagement() {
 
     try {
       setLoading(true);
+
+      // ── Jika ada file baru dipilih, upload dulu ──────────────────────────
+      let finalFotoUrl = foto; // Default: gambar lama (edit) atau kosong (add)
+
+      if (selectedFile) {
+        setUploading(true);
+        try {
+          finalFotoUrl = await dbSimulator.uploadMenuImage(selectedFile);
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : "Upload gagal.";
+          setFormError("Gagal upload gambar: " + msg);
+          setLoading(false);
+          setUploading(false);
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      // Fallback jika tidak ada gambar sama sekali (tambah baru tanpa pilih file)
+      if (!finalFotoUrl) {
+        finalFotoUrl = "https://images.unsplash.com/photo-1529042410759-befb1204b468?auto=format&fit=crop&w=150&q=80";
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const targetMenu: Menu = {
         id: modalMode === "edit" ? activeMenuId || "" : "",
         tenant_id: tenantId,
@@ -114,12 +199,13 @@ export default function AdminMenuManagement() {
         kategori,
         stok,
         status: stok === 0 ? "empty" : status,
-        foto: foto.trim() || "https://images.unsplash.com/photo-1529042410759-befb1204b468?auto=format&fit=crop&w=150&q=80",
+        foto: finalFotoUrl,
       };
 
       await dbSimulator.saveMenu(targetMenu);
       showToast(modalMode === "add" ? "Menu baru berhasil ditambahkan." : "Informasi menu berhasil diperbarui.");
       setIsModalOpen(false);
+      resetImageState();
       fetchData();
     } catch (err) {
       console.error(err);
@@ -143,6 +229,9 @@ export default function AdminMenuManagement() {
     const matchesCategory = selectedCategoryFilter === "all" || m.kategori === selectedCategoryFilter;
     return matchesSearch && matchesTenant && matchesCategory;
   });
+
+  // Gambar yang ditampilkan di preview area modal
+  const displayPreview = previewUrl || foto;
 
   return (
     <DashboardLayout roleRequired="admin">
@@ -240,8 +329,8 @@ export default function AdminMenuManagement() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
 
-            <div className="relative w-full max-w-md bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl z-10 animate-scale-up">
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between">
+            <div className="relative w-full max-w-md bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl z-10 animate-scale-up max-h-[90vh] overflow-y-auto">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between sticky top-0 bg-white dark:bg-[#0d1222] z-10">
                 <div className="flex items-center gap-2">
                   <UtensilsCrossed className="w-5 h-5 text-indigo-500" />
                   <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">{modalMode === "add" ? "Tambah Menu Baru" : "Edit Menu Hidangan"}</h3>
@@ -253,6 +342,99 @@ export default function AdminMenuManagement() {
 
               <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs sm:text-sm">
                 {formError && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 font-semibold">{formError}</div>}
+
+                {/* ── UPLOAD GAMBAR ──────────────────────────────────────────── */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                    <ImagePlus className="w-3 h-3" /> Foto Menu
+                    {modalMode === "edit" && !selectedFile && (
+                      <span className="text-slate-500 normal-case font-normal ml-1">(kosongkan untuk pertahankan gambar lama)</span>
+                    )}
+                  </label>
+
+                  {/* Preview Area */}
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative w-full h-40 rounded-xl overflow-hidden border-2 border-dashed cursor-pointer transition-all group ${
+                      displayPreview
+                        ? "border-indigo-400/30 hover:border-indigo-400"
+                        : "border-slate-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500"
+                    }`}
+                  >
+                    {displayPreview ? (
+                      <>
+                        <img
+                          src={displayPreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        {/* Overlay saat hover */}
+                        <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                          <Upload className="w-5 h-5 text-white" />
+                          <span className="text-white text-[10px] font-semibold">Ganti Gambar</span>
+                        </div>
+                        {/* Badge gambar baru */}
+                        {selectedFile && (
+                          <div className="absolute top-2 left-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                            Gambar Baru
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-600">
+                        <ImagePlus className="w-8 h-8" />
+                        <span className="text-[11px] font-semibold text-center px-4">
+                          Klik untuk pilih gambar<br />
+                          <span className="text-[10px] font-normal">JPG, PNG, WEBP • Maks. 5MB</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input file tersembunyi */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {/* Info file terpilih + tombol hapus pilihan */}
+                  {selectedFile ? (
+                    <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 rounded-lg px-3 py-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Upload className="w-3 h-3 text-indigo-500 shrink-0" />
+                        <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 truncate">
+                          {selectedFile.name}
+                        </span>
+                        <span className="text-[10px] text-indigo-400 shrink-0">
+                          ({(selectedFile.size / 1024).toFixed(0)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); resetImageState(); }}
+                        className="ml-2 text-indigo-400 hover:text-rose-400 transition-colors shrink-0"
+                        title="Batal pilih gambar"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/40 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-all"
+                    >
+                      <Upload className="w-3 h-3" /> Pilih File Gambar
+                    </button>
+                  )}
+                </div>
+                {/* ── END UPLOAD GAMBAR ───────────────────────────────────── */}
 
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-400 uppercase">Pemilik Tenant *</label>
@@ -330,27 +512,21 @@ export default function AdminMenuManagement() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase">URL Foto Menu</label>
-                  <input
-                    type="text"
-                    value={foto}
-                    onChange={(e) => setFoto(e.target.value)}
-                    placeholder="URL gambar hidangan"
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all"
-                  />
-                </div>
-
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-800/40 flex justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
                     className="bg-white hover:bg-slate-100 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 font-bold py-2.5 px-4 rounded-xl"
+                    disabled={uploading}
                   >
                     Batal
                   </button>
-                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center gap-1.5">
-                    <Save className="w-4 h-4" /> Simpan Menu
+                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center gap-1.5 disabled:opacity-60 disabled:pointer-events-none" disabled={uploading || loading}>
+                    {uploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Mengupload...</>
+                    ) : (
+                      <><Save className="w-4 h-4" /> Simpan Menu</>
+                    )}
                   </button>
                 </div>
               </form>

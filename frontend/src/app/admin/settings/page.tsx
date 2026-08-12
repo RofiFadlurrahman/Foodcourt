@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, User } from "@/services/dbSimulator";
 import { getSessionUser, setSessionUser } from "@/lib/session";
-import { Settings, Cloud, UploadCloud, DownloadCloud, Save, User as UserIcon, Lock, Globe, Palette, Bell, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Settings, Cloud, UploadCloud, DownloadCloud, Save, User as UserIcon, Lock, Globe, Palette, Bell, CheckCircle, AlertCircle, Loader2, Upload, X, ImagePlus } from "lucide-react";
 
 export default function AdminSettings() {
   const initialSessionUser = getSessionUser<User>();
@@ -24,6 +24,13 @@ export default function AdminSettings() {
   const [email, setEmail] = useState(initialSessionUser?.email ?? "");
   const [avatar, setAvatar] = useState(initialSessionUser?.avatar ?? "");
 
+  // ── State Upload Foto ──────────────────────────────────────────────────────
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Change Password States
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -34,8 +41,8 @@ export default function AdminSettings() {
   const [themeMode, setThemeMode] = useState(initialThemeMode);
   const [lowStockAlerts, setLowStockAlerts] = useState(true);
 
-  // File Upload Ref
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // File Upload Ref for Restore
+  const restoreFileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (themeMode === "dark") {
@@ -45,9 +52,50 @@ export default function AdminSettings() {
     }
   }, [themeMode]);
 
+  // Cleanup preview URL
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  const resetProfileImageState = () => {
+    if (previewUrl && previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl("");
+    if (profileFileInputRef.current) profileFileInputRef.current.value = "";
+  };
+
+  const handleProfileFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setErrorMessage("Format foto tidak diizinkan. Gunakan JPG, JPEG, PNG, atau WEBP.");
+      if (profileFileInputRef.current) profileFileInputRef.current.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Ukuran foto terlalu besar. Maksimal 5MB.");
+      if (profileFileInputRef.current) profileFileInputRef.current.value = "";
+      return;
+    }
+
+    setErrorMessage("");
+    if (previewUrl && previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setPreviewUrl(objectUrl);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -62,16 +110,42 @@ export default function AdminSettings() {
 
     setLoading(true);
     try {
+      // ── Upload Foto Baru Jika Ada ───────────────────────────────────────────
+      let finalAvatarUrl = avatar; 
+
+      if (selectedFile) {
+        setUploading(true);
+        try {
+          finalAvatarUrl = await dbSimulator.uploadProfileImage(selectedFile);
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : "Upload gagal.";
+          setErrorMessage("Gagal upload foto profil: " + msg);
+          setLoading(false);
+          setUploading(false);
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       const updatedUser: User = {
         ...user,
         fullName: fullName.trim(),
         email: email.trim(),
-        avatar: avatar.trim(),
+        avatar: finalAvatarUrl,
       };
 
       await dbSimulator.saveUser(updatedUser);
       setSessionUser(updatedUser);
       setUser(updatedUser);
+      setAvatar(finalAvatarUrl);
+
+      resetProfileImageState();
+
+      // Dispatch event to update navbar/header immediately without refresh
+      window.dispatchEvent(new Event("profile_updated"));
+
       showToast("Profil admin berhasil diperbarui.");
     } catch (e) {
       console.error(e);
@@ -142,43 +216,41 @@ export default function AdminSettings() {
 
   // 2. CLOUD DATABASE RESTORE
   const handleCloudRestore = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+    if (restoreFileInputRef.current) {
+      restoreFileInputRef.current.click();
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestoreFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
+    if (confirm("PERINGATAN!\n\nProses ini akan MENGHAPUS SELURUH DATA LAMA dan menimpanya dengan data dari file backup. Apakah Anda yakin?")) {
       try {
-        const jsonContent = event.target?.result as string;
-        const restored = await dbSimulator.importBackup(jsonContent);
-        if (restored) {
-          showToast("Database Cloud Berhasil Dipulihkan! Me-refresh halaman...");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        } else {
-          setErrorMessage("File backup tidak valid atau rusak.");
-          setLoading(false);
-        }
+        setLoading(true);
+        const textData = await file.text();
+        await dbSimulator.restoreBackup(textData);
+        alert("Restore Database Berhasil!\n\nHalaman akan dimuat ulang.");
+        window.location.reload();
       } catch (err) {
         console.error(err);
-        setErrorMessage("Format file tidak valid.");
+        alert("Gagal merestore database. Pastikan file backup valid.");
+      } finally {
         setLoading(false);
       }
-    };
-    reader.readAsText(file);
+    }
+    
+    if (restoreFileInputRef.current) {
+      restoreFileInputRef.current.value = "";
+    }
   };
+
+  const displayAvatar = previewUrl || avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
 
   return (
     <DashboardLayout roleRequired="admin">
-      <div className="space-y-6">
-        {/* Toast */}
+      <div className="space-y-6 max-w-5xl mx-auto">
+        {/* Toast Notification */}
         {toastMessage && (
           <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white rounded-xl p-4 shadow-xl flex items-center gap-3 animate-slide-up text-xs font-semibold">
             <CheckCircle className="w-4 h-4 text-emerald-400" />
@@ -186,13 +258,15 @@ export default function AdminSettings() {
           </div>
         )}
 
-        {/* Hidden File Input for Restore */}
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
-
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Pengaturan Sistem</h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">Konfigurasi preferensi global, kelola profil, dan lakukan pencadangan data cloud.</p>
+        {/* Header Section */}
+        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800/60 pb-5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+            <Settings className="w-5 h-5 text-indigo-500" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight">Pengaturan Sistem</h1>
+            <p className="text-slate-500 text-sm mt-0.5">Kelola profil, preferensi, dan konfigurasi database.</p>
+          </div>
         </div>
 
         {errorMessage && (
@@ -202,187 +276,235 @@ export default function AdminSettings() {
           </div>
         )}
 
-        {/* Grid layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs sm:text-sm font-semibold">
-          {/* Column 1: Profile & Password */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Form Profile */}
-            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 flex items-center gap-1.5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column (Profile & Password) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* Profil Admin Settings */}
+            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-extrabold flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/40 pb-4 mb-5">
                 <UserIcon className="w-4 h-4 text-indigo-500" /> Profil Administrator
-              </span>
+              </h2>
+              
+              <form onSubmit={handleSaveProfile} className="space-y-5">
+                
+                {/* ── UPLOAD FOTO PROFIL UI ────────────────────────────────────── */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-2">
+                  <div className="relative group">
+                    <img 
+                      src={displayAvatar} 
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover border-4 border-slate-100 dark:border-slate-800 bg-slate-800"
+                    />
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-slate-900/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                         onClick={() => profileFileInputRef.current?.click()}>
+                      <Upload className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <input 
+                      type="file" 
+                      ref={profileFileInputRef} 
+                      onChange={handleProfileFileChange} 
+                      accept="image/jpeg,image/jpg,image/png,image/webp" 
+                      className="hidden" 
+                    />
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => profileFileInputRef.current?.click()}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 font-bold py-1.5 px-3 rounded-lg text-[11px] transition-all flex items-center gap-1.5"
+                      >
+                        <ImagePlus className="w-3.5 h-3.5" /> Ganti Foto Profil
+                      </button>
+                      {selectedFile && (
+                        <button type="button" onClick={resetProfileImageState} className="text-slate-400 hover:text-rose-400 transition-colors p-1" title="Batal">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {selectedFile && (
+                      <div className="text-[10px] text-indigo-500 font-semibold max-w-[200px] truncate">File: {selectedFile.name}</div>
+                    )}
+                    <p className="text-[10px] text-slate-500 font-medium">Format JPG, PNG, atau WEBP. Maks 5MB.</p>
+                  </div>
+                </div>
+                {/* ────────────────────────────────────────────────────────────── */}
 
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase">Nama Lengkap *</label>
-                    <input
-                      type="text"
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase">Nama Lengkap</label>
+                    <input 
+                      type="text" 
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase">Email Administrator *</label>
-                    <input
-                      type="email"
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase">Alamat Email</label>
+                    <input 
+                      type="email" 
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase">URL Link Avatar Foto</label>
-                  <input
-                    type="text"
-                    value={avatar}
-                    onChange={(e) => setAvatar(e.target.value)}
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                  />
+                
+                <div className="flex justify-end pt-2">
+                  <button type="submit" disabled={loading || uploading} className="bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-slate-900/10 dark:shadow-indigo-600/20 disabled:opacity-60">
+                    {uploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Mengupload...</>
+                    ) : (
+                      <><Save className="w-3.5 h-3.5" /> Simpan Profil</>
+                    )}
+                  </button>
                 </div>
-
-                <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center gap-1.5 transition-all" disabled={loading}>
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  <span>Simpan Profil</span>
-                </button>
               </form>
             </div>
 
-            {/* Form Password */}
-            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-indigo-500" /> Perbarui Password Akun
-              </span>
-
+            {/* Change Password Settings */}
+            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-extrabold flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/40 pb-4 mb-5">
+                <Lock className="w-4 h-4 text-indigo-500" /> Keamanan & Password
+              </h2>
               <form onSubmit={handleChangePassword} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase">Password Lama *</label>
-                  <input
-                    type="password"
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase">Password Saat Ini</label>
+                  <input 
+                    type="password" 
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    placeholder="Masukkan password lama"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase">Password Baru *</label>
-                    <input
-                      type="password"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase">Password Baru</label>
+                    <input 
+                      type="password" 
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="Password baru"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase">Konfirmasi Password Baru *</label>
-                    <input
-                      type="password"
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase">Ulangi Password Baru</label>
+                    <input 
+                      type="password" 
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="Ulangi password"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
-
-                <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center gap-1.5 transition-all" disabled={loading}>
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Ubah Password</span>
-                </button>
+                <div className="flex justify-end pt-2">
+                  <button type="submit" disabled={loading} className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-bold py-2.5 px-5 rounded-xl text-xs transition-all border border-transparent dark:border-slate-700 disabled:opacity-50">
+                    Perbarui Password
+                  </button>
+                </div>
               </form>
             </div>
           </div>
 
-          {/* Column 2: Backup Cloud & Preferences */}
-          <div className="space-y-6">
-            {/* Backup & Restore Cloud Box */}
-            <div className="dark bg-[#090d16] text-slate-100 border border-slate-800 rounded-2xl p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between h-72">
-              <div className="absolute top-[-10%] right-[-10%] w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl" />
-
-              <div>
-                <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block mb-4 flex items-center gap-1.5">
-                  <Cloud className="w-4 h-4 text-cyan-400" /> Cloud Database Manager
-                </span>
-                <p className="text-xs text-slate-400 leading-relaxed font-semibold">Cadangkan data transaksi, menu, tenant, dan user pengakses foodcourt Anda ke file JSON lokal, atau pulihkan data kapan saja dari salinan cadangan.</p>
-              </div>
-
-              <div className="space-y-2.5 pt-4 border-t border-slate-800/40">
-                <button
-                  onClick={handleCloudBackup}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  disabled={loading}
-                >
-                  <DownloadCloud className="w-4 h-4" /> Unduh Backup Cloud
-                </button>
-
-                <button
-                  onClick={handleCloudRestore}
-                  className="w-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  disabled={loading}
-                >
-                  <UploadCloud className="w-4 h-4" /> Unggah & Restore Cloud
-                </button>
-              </div>
-            </div>
-
-            {/* System Preferences */}
-            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-5 shadow-sm">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 flex items-center gap-1.5">
-                <Settings className="w-4 h-4 text-indigo-500" /> Preferensi Sistem
-              </span>
-
-              <form onSubmit={handleSavePreferences} className="space-y-4">
-                {/* Language Select */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5" /> Bahasa Sistem
-                  </label>
-                  <select
+          {/* Right Column (Preferences & Database) */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* App Preferences */}
+            <div className="bg-white dark:bg-[#0d1222] border border-slate-200 dark:border-slate-800/40 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-extrabold flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/40 pb-4 mb-5">
+                <Palette className="w-4 h-4 text-indigo-500" /> Preferensi Tampilan
+              </h2>
+              <form onSubmit={handleSavePreferences} className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg"><Globe className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Bahasa</span>
+                  </div>
+                  <select 
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
                   >
-                    <option value="id">Bahasa Indonesia (Default)</option>
-                    <option value="en">English (US)</option>
+                    <option value="id">Indonesia</option>
+                    <option value="en">English</option>
                   </select>
                 </div>
 
-                {/* Theme Select */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Palette className="w-3.5 h-3.5" /> Tema Antarmuka
-                  </label>
-                  <select
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg"><Palette className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Tema Warna</span>
+                  </div>
+                  <select 
                     value={themeMode}
                     onChange={(e) => setThemeMode(e.target.value)}
-                    className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
                   >
-                    <option value="dark">Dark Theme (Rekomendasi SaaS)</option>
-                    <option value="light">Light Theme (Minimalis Terang)</option>
+                    <option value="light">Mode Terang (Light)</option>
+                    <option value="dark">Mode Gelap (Dark)</option>
                   </select>
                 </div>
 
-                {/* Switch Low stock */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/30">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-xs flex items-center gap-1">
-                      <Bell className="w-3.5 h-3.5" /> Peringatan Stok
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold">Beri notifikasi stok menu menipis</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg"><Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Notif Stok Menipis</span>
                   </div>
-                  <input type="checkbox" checked={lowStockAlerts} onChange={(e) => setLowStockAlerts(e.target.checked)} className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500" />
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={lowStockAlerts} onChange={() => setLowStockAlerts(!lowStockAlerts)} />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-500"></div>
+                  </label>
                 </div>
 
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-1.5 transition-all" disabled={loading}>
-                  <Save className="w-4 h-4" />
-                  <span>Simpan Preferensi</span>
-                </button>
+                <div className="pt-2">
+                  <button type="submit" className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-bold py-2.5 rounded-xl text-xs transition-all border border-transparent dark:border-slate-700">
+                    Simpan Preferensi
+                  </button>
+                </div>
               </form>
             </div>
+
+            {/* Cloud Database Management */}
+            <div className="bg-indigo-600 dark:bg-indigo-500 border border-indigo-500 rounded-2xl p-6 shadow-sm text-white overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                <Cloud className="w-32 h-32" />
+              </div>
+              
+              <div className="relative z-10">
+                <h2 className="text-sm font-extrabold flex items-center gap-2 border-b border-indigo-400/30 pb-4 mb-4">
+                  <Cloud className="w-4 h-4 text-indigo-100" /> Manajemen Database
+                </h2>
+                <p className="text-xs text-indigo-100 mb-5 leading-relaxed">
+                  Cadangkan seluruh data ke komputer Anda sebagai file JSON, atau restore data dari cadangan yang sudah ada.
+                </p>
+
+                <input type="file" accept=".json" className="hidden" ref={restoreFileInputRef} onChange={handleRestoreFileChange} />
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleCloudBackup}
+                    disabled={loading}
+                    className="w-full bg-white text-indigo-600 hover:bg-indigo-50 font-extrabold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-black/10"
+                  >
+                    <DownloadCloud className="w-4 h-4" /> Download Backup (JSON)
+                  </button>
+                  <button 
+                    onClick={handleCloudRestore}
+                    disabled={loading}
+                    className="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all border border-indigo-500"
+                  >
+                    <UploadCloud className="w-4 h-4" /> Restore dari File
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

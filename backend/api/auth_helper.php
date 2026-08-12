@@ -1,4 +1,8 @@
 <?php
+// Prevent PHP notices/warnings from polluting JSON output
+ini_set('display_errors', 0);
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+
 // Include CORS configuration
 require_once __DIR__ . '/cors.php';
 
@@ -10,15 +14,25 @@ if (session_status() === PHP_SESSION_NONE) {
     // Prevent session ID from being passed in URLs
     ini_set('session.use_only_cookies', 1);
     
-    // Set cookie parameters
-    session_set_cookie_params([
-        'lifetime' => 0, // Session cookie expires when browser closes
-        'path' => '/',
-        'domain' => '', // Default to current domain (localhost)
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
+    // Set cookie parameters - supports array syntax for PHP >= 7.3, and standard syntax for older PHP
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0, // Session cookie expires when browser closes
+            'path' => '/',
+            'domain' => '', // Default to current domain (localhost)
+            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        session_set_cookie_params(
+            0,
+            '/; samesite=Lax',
+            '',
+            isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            true
+        );
+    }
     
     session_start();
 }

@@ -67,7 +67,7 @@ export default function TenantCashier() {
 
   // Midtrans Mock/Simulated Snap States
   const [isMockSnapOpen, setIsMockSnapOpen] = useState(false);
-  const [mockSnapToken, setMockSnapToken] = useState("");
+  const [, setMockSnapToken] = useState("");
   const [mockSnapDetails, setMockSnapDetails] = useState<MockSnapDetails | null>(null);
   const [mockSnapPaymentType, setMockSnapPaymentType] = useState<"qris" | "va" | "cc">("qris");
   const [mockProcessing, setMockProcessing] = useState(false);
@@ -75,7 +75,6 @@ export default function TenantCashier() {
   // Virtual Receipt Modal
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptTx, setReceiptTx] = useState<ReceiptTx | null>(null);
-  const [changeAmount, setChangeAmount] = useState(0);
 
   const fetchData = async () => {
     try {
@@ -97,17 +96,6 @@ export default function TenantCashier() {
 
   useEffect(() => {
     void Promise.resolve().then(fetchData);
-
-    // Dynamically inject Midtrans Snap Sandbox script
-    const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "SB-Mid-client-YOUR_DUMMY_KEY";
-    const script = document.createElement("script");
-    script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
-    script.setAttribute("data-client-key", clientKey);
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
   }, []);
 
   const addToCart = (menu: Menu) => {
@@ -203,86 +191,71 @@ export default function TenantCashier() {
     const total = getSubtotal();
 
     if (paymentMethod === "Midtrans") {
+      if (cart.length === 0) return;
       setProcessing(true);
+
       try {
-        const orderId = `order-${Date.now()}`;
-        const res = await fetch("/api/midtrans/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            orderId,
-            grossAmount: total,
-            items: cart.map(item => ({
-              id: item.menu.id,
-              price: item.menu.harga,
-              quantity: item.qty,
-              name: item.menu.nama_menu
-            }))
-          })
+        const itemTotal = cart.reduce((sum, i) => sum + i.menu.harga * i.qty, 0);
+        const firstItem = cart[0]; // Backend hanya terima 1 menu per request
+
+        // Gunakan dbSimulator.createMidtransTransaction agar apiFetch
+        // mengirim X-Session-Tenant-ID yang benar dari session_tenant
+        const data = await dbSimulator.createMidtransTransaction({
+          menu_id:        firstItem.menu.id,
+          jumlah:         firstItem.qty,
+          total_harga:    itemTotal,
+          customer_name:  activeTenant?.nama_pemilik || "Customer",
+          customer_email: activeTenant?.email       || "customer@foodcourt.com",
+          customer_phone: activeTenant?.hp          || "",
         });
 
-        const data = await res.json();
+        if (data.error) {
+          alert("Gagal membuat transaksi: " + data.error);
+          setProcessing(false);
+          return;
+        }
 
-        if (data.isMock) {
-          setMockSnapToken(data.token);
-          setMockSnapDetails({
-            orderId,
-            total,
-            items: cart.map(item => ({
-              name: item.menu.nama_menu,
-              qty: item.qty,
-              price: item.menu.harga
-            }))
+        // Buka Midtrans Snap UI dengan token asli
+        const win = window as WindowWithSnap;
+        if (win.snap) {
+          win.snap.pay(data.snap_token, {
+            onSuccess: async function () {
+              setCart([]);
+              setCashAmount("");
+              setReceiptTx({
+                id: data.order_id,
+                date: new Date().toISOString(),
+                items: cart.map(i => ({
+                  name: i.menu.nama_menu,
+                  qty:  i.qty,
+                  harga: i.menu.harga,
+                  total: i.menu.harga * i.qty,
+                })),
+                total:         itemTotal,
+                paymentMethod: "Midtrans",
+                cashPaid:      itemTotal,
+                change:        0,
+              });
+              setIsReceiptOpen(true);
+              await fetchData();
+            },
+            onPending: function () {
+              alert("Pembayaran pending. Selesaikan di aplikasi pembayaran Anda.");
+            },
+            onError: function () {
+              alert("Pembayaran gagal. Silakan coba lagi.");
+            },
+            onClose: function () {
+              // Tidak ada aksi — user tutup tanpa bayar
+            },
           });
-          setIsMockSnapOpen(true);
         } else {
-          const win = window as WindowWithSnap;
-          if (win.snap) {
-            win.snap.pay(data.token, {
-              onSuccess: async function (result: unknown) {
-                await saveTransactionToLocal("Midtrans", total, 0);
-              },
-              onPending: function (result: unknown) {
-                alert("Pembayaran pending. Selesaikan proses pembayaran Anda.");
-              },
-              onError: function (result: unknown) {
-                alert("Pembayaran gagal!");
-              },
-              onClose: function () {
-                alert("Pembayaran dibatalkan.");
-              }
-            });
-          } else {
-            // fallback if snap script failed to load
-            setMockSnapToken(data.token);
-            setMockSnapDetails({
-              orderId,
-              total,
-              items: cart.map(item => ({
-                name: item.menu.nama_menu,
-                qty: item.qty,
-                price: item.menu.harga
-              }))
-            });
-            setIsMockSnapOpen(true);
-          }
+          alert("Midtrans Snap belum dimuat. Reload halaman dan coba lagi.");
         }
       } catch (err) {
-        console.error("Midtrans Snap Error:", err);
-        // graceful offline fallback
-        setMockSnapToken(`mock-snap-token-${Date.now()}`);
-        setMockSnapDetails({
-          orderId: `order-${Date.now()}`,
-          total,
-          items: cart.map(item => ({
-            name: item.menu.nama_menu,
-            qty: item.qty,
-            price: item.menu.harga
-          }))
-        });
-        setIsMockSnapOpen(true);
+        console.error("Midtrans Error:", err);
+        const msg = err instanceof Error ? err.message : "Kesalahan tidak diketahui";
+        alert("Gagal terhubung ke payment gateway: " + msg);
       } finally {
         setProcessing(false);
       }
@@ -298,7 +271,6 @@ export default function TenantCashier() {
         return;
       }
       change = cash - total;
-      setChangeAmount(change);
     }
 
     setProcessing(true);

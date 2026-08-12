@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction, Tenant, Menu } from "@/services/dbSimulator";
-import { FileText, Calendar, Store, UtensilsCrossed, Printer, FileSpreadsheet, ArrowUpRight, ChevronRight, BarChart } from "lucide-react";
+import { FileText, Calendar, Store, UtensilsCrossed, Printer, FileSpreadsheet } from "lucide-react";
 
 export default function ReportPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -58,7 +58,7 @@ export default function ReportPage() {
     };
   }, []);
 
-  const generateReport = () => {
+  const generateReport = useCallback(() => {
     const now = new Date();
     const startDate = new Date();
 
@@ -133,7 +133,7 @@ export default function ReportPage() {
       qtySold: totalQty,
       revenue: totalRevenue,
     });
-  };
+  }, [reportPeriod, selectedTenant, selectedMenu, transactions]);
 
   useEffect(() => {
     if (transactions.length > 0) {
@@ -143,7 +143,7 @@ export default function ReportPage() {
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [reportPeriod, selectedTenant, selectedMenu, transactions, menus, tenants]);
+  }, [generateReport, transactions.length]);
 
   const formatRupiah = (value: number) => {
     return new Intl.NumberFormat("id-ID", {

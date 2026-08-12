@@ -23,8 +23,8 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children, roleRequired }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<DBUser | null>(() => getSessionUser<DBUser>());
-  const [tenant, setTenant] = useState<DBTenant | null>(() => getSessionTenant<DBTenant>());
+  const [user] = useState<DBUser | null>(() => getSessionUser<DBUser>());
+  const [tenant] = useState<DBTenant | null>(() => getSessionTenant<DBTenant>());
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === "undefined") return false;
     const stored = (typeof window !== "undefined" && window.localStorage.getItem("foodcourt_theme")) || "light";
@@ -33,7 +33,7 @@ export default function DashboardLayout({ children, roleRequired }: DashboardLay
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const [notifications, setNotifications] = useState([
     { id: 1, text: "Stok Bakso Urat tinggal 5 porsi (Stan A-01)", type: "warning", time: "5 mnt lalu" },

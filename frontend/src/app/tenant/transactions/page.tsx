@@ -5,7 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction, Tenant, Menu } from "@/services/dbSimulator";
 import { getSessionTenant } from "@/lib/session";
 import {
-  ReceiptText, Search, Printer, FileSpreadsheet, CheckCircle
+  Search, Printer, FileSpreadsheet, CheckCircle
 } from "lucide-react";
 
 export default function TenantTransactions() {

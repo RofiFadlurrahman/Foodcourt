@@ -2,6 +2,9 @@
 require_once __DIR__ . '/auth_helper.php';
 
 try {
+    // Only admin can perform database reset
+    $session = require_auth(['admin']);
+
     // Disable FK checks and drop all tables to start clean
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
     $pdo->exec("DROP TABLE IF EXISTS `transactions`");
@@ -101,8 +104,8 @@ try {
         (3, 9, 2, 16000.00, DATE_SUB(NOW(), INTERVAL 2 HOUR), 'QRIS'),
         (1, 1, 4, 100000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'QRIS'),
         (1, 2, 3, 66000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Cash'),
-        (2, 5, 5, 90000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Debit'),
-        (2, 6, 4, 64000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'QRIS'),
+        (2, 4, 5, 90000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Debit'),
+        (2, 5, 4, 64000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'QRIS'),
         (3, 8, 3, 105000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Midtrans'),
         (3, 9, 5, 40000.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 'Cash')");
 

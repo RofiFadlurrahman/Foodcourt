@@ -7,10 +7,15 @@ try {
     switch ($method) {
         case 'GET':
             // Resolve session (bisa dari header maupun cookie native)
-            $session = require_auth();
+            $session = null;
+            try {
+                $session = require_auth();
+            } catch (Exception $e) {
+                // Biarkan tamu/guest mengakses daftar username tanpa session
+            }
             
             // Jika masuk sebagai admin, kembalikan daftar lengkap user milik admin ini saja
-            if ($session['role'] === 'admin') {
+            if ($session && $session['role'] === 'admin') {
                 $stmt = $pdo->prepare("SELECT id, username, role, fullName, email, avatar FROM users WHERE created_by = :admin_id1 OR id = :admin_id2");
                 $stmt->execute([
                     'admin_id1' => $session['user_id'],
@@ -71,14 +76,39 @@ try {
             }
 
             if ($session && $session['role'] === 'admin') {
+                // Admin yang login membuat tenant — gunakan ID admin tersebut
                 $created_by = $session['user_id'];
             } else {
                 if ($role === 'admin') {
-                    $created_by = null; // Independent new admin space
+                    // Registrasi admin baru yang independent
+                    $created_by = null;
                 } else {
-                    // Default to the first admin in DB for guest tenant registration
-                    $adminQuery = $pdo->query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
-                    $created_by = $adminQuery->fetchColumn() ?: null;
+                    // Self-registrasi tenant: WAJIB menyertakan kode undangan yang valid
+                    $invitation_code = isset($input['invitation_code']) ? strtoupper(trim($input['invitation_code'])) : '';
+
+                    if (empty($invitation_code)) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Kode undangan wajib disertakan untuk mendaftar sebagai tenant. Minta kode kepada admin Food Court Anda.']);
+                        exit();
+                    }
+
+                    // Cari kode undangan yang masih aktif & belum kedaluwarsa
+                    $invStmt = $pdo->prepare(
+                        "SELECT * FROM tenant_invitations WHERE code = :code AND status = 'active' AND expires_at > NOW()"
+                    );
+                    $invStmt->execute(['code' => $invitation_code]);
+                    $invitation = $invStmt->fetch();
+
+                    if (!$invitation) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Kode undangan tidak valid, sudah digunakan, atau sudah kedaluwarsa.']);
+                        exit();
+                    }
+
+                    // created_by diambil dari kode undangan — bukan dari frontend
+                    $created_by = $invitation['admin_id'];
+                    // Simpan ID undangan untuk dipakai di bawah (tandai sebagai used)
+                    $valid_invitation_id = $invitation['id'];
                 }
             }
 
@@ -95,6 +125,12 @@ try {
             ]);
 
             $newId = $pdo->lastInsertId();
+
+            // Tandai kode undangan sebagai 'used' jika digunakan oleh tenant baru
+            if (!empty($valid_invitation_id)) {
+                $pdo->prepare("UPDATE tenant_invitations SET status='used' WHERE id=:id")
+                    ->execute(['id' => $valid_invitation_id]);
+            }
             
             // Return new user profile (exclude password)
             $responseUser = [

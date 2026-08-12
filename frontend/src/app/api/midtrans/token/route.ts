@@ -19,7 +19,13 @@ export async function POST(request: Request) {
 
     const tokenBase64 = Buffer.from(serverKey + ':').toString('base64');
     
-    const response = await fetch('https://app.midtrans.com/snap/v1/transactions', {
+    // Choose endpoint dynamically: if the server key starts with Mid-server-, it's production; otherwise (e.g. SB-), it's sandbox.
+    const isProduction = serverKey.startsWith('Mid-server-');
+    const midtransUrl = isProduction
+      ? 'https://app.midtrans.com/snap/v1/transactions'
+      : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+    
+    const response = await fetch(midtransUrl, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

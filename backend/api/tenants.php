@@ -99,14 +99,21 @@ try {
                 exit();
             }
 
-            // Fetch existing tenant record
-            $fetchStmt = $pdo->prepare("SELECT * FROM tenants WHERE id = :id");
+            // Fetch existing tenant record (dengan JOIN untuk validasi ownership)
+            $fetchStmt = $pdo->prepare("SELECT t.*, u.created_by FROM tenants t JOIN users u ON t.user_id = u.id WHERE t.id = :id");
             $fetchStmt->execute(['id' => $targetId]);
             $existingTenant = $fetchStmt->fetch();
 
             if (!$existingTenant) {
                 http_response_code(404);
                 echo json_encode(['error' => 'Tenant tidak ditemukan.']);
+                exit();
+            }
+
+            // Ownership check untuk admin: pastikan tenant milik admin yang login
+            if ($session['role'] === 'admin' && (int)$existingTenant['created_by'] !== (int)$session['user_id']) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Anda tidak memiliki akses untuk mengubah tenant ini.']);
                 exit();
             }
 
@@ -152,12 +159,23 @@ try {
             
         case 'DELETE':
             // Only admin can delete tenants
-            require_auth(['admin']);
+            $session = require_auth(['admin']);
             
             $id = isset($_GET['id']) ? trim($_GET['id']) : '';
             if (empty($id)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'ID query parameter wajib disertakan.']);
+                exit();
+            }
+
+            // Verifikasi ownership: tenant harus milik admin yang login
+            $ownerCheck = $pdo->prepare(
+                "SELECT t.id FROM tenants t JOIN users u ON t.user_id = u.id WHERE t.id = :id AND u.created_by = :admin_id"
+            );
+            $ownerCheck->execute(['id' => $id, 'admin_id' => $session['user_id']]);
+            if (!$ownerCheck->fetch()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden. Tenant tidak ditemukan atau bukan milik Anda.']);
                 exit();
             }
 

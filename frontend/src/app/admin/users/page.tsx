@@ -5,8 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, User } from "@/services/dbSimulator";
 import { getSessionUser } from "@/lib/session";
 import {
-  Users, Plus, Pencil, Trash2, X, Save, Mail,
-  User as UserIcon, Lock, CheckCircle, Search, ShieldCheck
+  Plus, Pencil, Trash2, X, Save, CheckCircle, Search, ShieldCheck
 } from "lucide-react";
 
 export default function UserManagement() {

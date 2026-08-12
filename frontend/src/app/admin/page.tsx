@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import { dbSimulator, Transaction } from "@/services/dbSimulator";
-import { ReceiptText, Store, DollarSign, ArrowUpRight, Calendar, Activity, TrendingUp, Wallet } from "lucide-react";
+import { ReceiptText, Store, DollarSign, ArrowUpRight, Calendar, Activity } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 
 // Warm food court palette for charts

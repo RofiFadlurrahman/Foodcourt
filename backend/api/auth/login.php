@@ -60,6 +60,10 @@ try {
     if ($tenant) {
         $response['tenant'] = format_db_row($tenant);
     }
+    // Sertakan admin_id (created_by) sehingga frontend tahu siapa admin dari tenant ini
+    if ($user['role'] === 'tenant' && !empty($user['created_by'])) {
+        $response['admin_id'] = (string)$user['created_by'];
+    }
 
     http_response_code(200);
     echo json_encode($response);

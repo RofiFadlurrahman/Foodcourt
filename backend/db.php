@@ -3,16 +3,34 @@
 $host     = 'localhost';
 $dbname   = 'foodcourt_db';
 $username = 'root';
-$password = 'Rofi@12345'; // Password Laragon Anda
+$possible_passwords = ['Rofi@12345', '', 'root', 'admin'];
+
+$pdo = null;
+$connected = false;
+$last_exception = null;
+$password = '';
+
+foreach ($possible_passwords as $pwd) {
+    try {
+        // 1. Koneksi awal ke server MySQL (tanpa dbname agar tidak error jika db belum dibuat)
+        $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $username, $pwd, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Melempar exception jika terjadi error SQL
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Hasil fetch berupa array asosiatif
+            PDO::ATTR_EMULATE_PREPARES   => false,                  /// Menonaktifkan emulasi
+        ]);
+        $password = $pwd; // Simpan password yang berhasil digunakan
+        $connected = true;
+        break;
+    } catch (PDOException $e) {
+        $last_exception = $e;
+    }
+}
+
+if (!$connected) {
+    throw $last_exception;
+}
 
 try {
-    // 1. Koneksi awal ke server MySQL (tanpa dbname agar tidak error jika db belum dibuat)
-    $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $username, $password, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Melempar exception jika terjadi error SQL
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Hasil fetch berupa array asosiatif
-        PDO::ATTR_EMULATE_PREPARES   => false,                  /// Menonaktifkan emulasi
-    ]);
-
     // 2. Buat database secara otomatis jika belum ada
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
     
