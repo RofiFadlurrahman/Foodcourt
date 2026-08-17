@@ -1,6 +1,6 @@
 -- 1. PEMBUATAN DATABASE
-CREATE DATABASE IF NOT EXISTS `foodcourt_db`;
-USE `foodcourt_db`;
+-- CREATE DATABASE IF NOT EXISTS `foodcourt_db`;
+-- USE `foodcourt_db`;
 
 -- 2. HAPUS TABEL JIKA SUDAH ADA (Untuk keperluan reset/re-install)
 DROP TABLE IF EXISTS `transactions`;

@@ -1,9 +1,9 @@
 <?php
 // Pengaturan Koneksi Database
-$host     = 'localhost';
-$dbname   = 'foodcourt_db';
-$username = 'root';
-$possible_passwords = ['Rofi@12345', '', 'root', 'admin'];
+$host     = 'sql309.ezyro.com';
+$dbname   = 'ezyro_42639789_foodcourt';
+$username = 'ezyro_42639789';
+$possible_passwords = ['b9380654'];
 
 $pdo = null;
 $connected = false;
