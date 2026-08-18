@@ -31,7 +31,12 @@ foreach ($possible_passwords as $pwd) {
 }
 
 if (!$connected) {
-    throw $last_exception;
+    http_response_code(500);
+    header("Content-Type: application/json; charset=UTF-8");
+    echo json_encode([
+        'error' => 'Gagal koneksi ke database: ' . ($last_exception ? $last_exception->getMessage() : 'Unknown error')
+    ]);
+    exit();
 }
 
 try {
