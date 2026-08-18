@@ -181,7 +181,13 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       try {
         const errorData = JSON.parse(responseText);
         if (errorData && errorData.error) {
-          errorMessage = errorData.error;
+          errorMessage = typeof errorData.error === "string"
+            ? errorData.error
+            : JSON.stringify(errorData.error);
+        } else if (errorData && errorData.message) {
+          errorMessage = typeof errorData.message === "string"
+            ? errorData.message
+            : JSON.stringify(errorData.message);
         }
       } catch {}
       throw new Error(errorMessage);
