@@ -4,8 +4,10 @@
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowed_origin = 'http://localhost:3000';
 
-if ($origin !== '' && preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$|vercel\.app$#', $origin)) {
-    $allowed_origin = $origin;
+if ($origin !== '') {
+    if (preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$#', $origin) || preg_match('#\.vercel\.app$#', $origin) || preg_match('#railway\.app$#', $origin)) {
+        $allowed_origin = $origin;
+    }
 }
 
 header("Access-Control-Allow-Origin: " . $allowed_origin);
