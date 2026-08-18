@@ -1,9 +1,13 @@
 <?php
 // Pengaturan Koneksi Database
-$host     = 'sql309.ezyro.com';
-$dbname   = 'ezyro_42639789_foodcourt';
-$username = 'ezyro_42639789';
-$possible_passwords = ['b9380654'];
+// Prioritas: env variable (Railway) → fallback hardcoded (lokal/ezyro)
+$host     = getenv('MYSQLHOST')     ?: getenv('DB_HOST')     ?: 'sql309.ezyro.com';
+$dbname   = getenv('MYSQLDATABASE') ?: getenv('DB_NAME')     ?: 'ezyro_42639789_foodcourt';
+$username = getenv('MYSQLUSER')     ?: getenv('DB_USER')     ?: 'ezyro_42639789';
+$db_port  = getenv('MYSQLPORT')     ?: getenv('DB_PORT')     ?: '3306';
+$possible_passwords = [
+    getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: 'b9380654'
+];
 
 $pdo = null;
 $connected = false;
@@ -13,7 +17,7 @@ $password = '';
 foreach ($possible_passwords as $pwd) {
     try {
         // 1. Koneksi awal ke server MySQL (tanpa dbname agar tidak error jika db belum dibuat)
-        $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $username, $pwd, [
+        $pdo = new PDO("mysql:host=$host;port=$db_port;charset=utf8mb4", $username, $pwd, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Melempar exception jika terjadi error SQL
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Hasil fetch berupa array asosiatif
             PDO::ATTR_EMULATE_PREPARES   => false,                  /// Menonaktifkan emulasi
