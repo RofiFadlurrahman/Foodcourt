@@ -6,7 +6,7 @@ $dbname   = getenv('MYSQLDATABASE') ?: getenv('DB_NAME')     ?: 'ezyro_42639789_
 $username = getenv('MYSQLUSER')     ?: getenv('DB_USER')     ?: 'ezyro_42639789';
 $db_port  = getenv('MYSQLPORT')     ?: getenv('DB_PORT')     ?: '3306';
 $possible_passwords = [
-    getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: 'b9380654'
+    getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: getenv('DB_PASS') ?: 'b9380654'
 ];
 
 $pdo = null;
