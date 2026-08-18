@@ -1,15 +1,6 @@
 <?php
 
-header("Access-Control-Allow-Origin: https://foodcourt-989fnjkti-rofifadlurrahman16-6387s-projects.vercel.app");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-// Include auth helper
+require_once __DIR__ . '/../cors.php';
 require_once __DIR__ . '/../auth_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
