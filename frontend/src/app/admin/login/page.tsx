@@ -50,7 +50,13 @@ export default function AdminLoginPage() {
         setLoading(false);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan sistem. Coba lagi.");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === "string") {
+        setError(err);
+      } else {
+        setError("Tidak dapat terhubung ke server. Pastikan backend sudah aktif.");
+      }
       setLoading(false);
     }
   };
