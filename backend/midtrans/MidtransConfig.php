@@ -1,7 +1,6 @@
 <?php
 /**
  * MidtransConfig.php — Helper untuk Midtrans API
- * Membaca key dari file .env di root backend
  */
 
 class MidtransConfig
@@ -14,33 +13,31 @@ class MidtransConfig
 
     public static function init(): void
     {
-        // Baca .env — coba beberapa lokasi
-        $envFile = __DIR__ . '/../../.env';
-        if (!file_exists($envFile)) {
-            $envFile = __DIR__ . '/../.env';
+        // 1. Ambil Key dari ENV / SERVER / Fallback langsung
+        self::$serverKey = $_ENV['MIDTRANS_SERVER_KEY'] 
+            ?? $_SERVER['MIDTRANS_SERVER_KEY'] 
+            ?? getenv('MIDTRANS_SERVER_KEY') 
+            ?: 'Mid-server-cOI5_k1MGlAWjsrvuSnHItSI';
+
+        self::$clientKey = $_ENV['MIDTRANS_CLIENT_KEY'] 
+            ?? $_SERVER['MIDTRANS_CLIENT_KEY'] 
+            ?? getenv('MIDTRANS_CLIENT_KEY') 
+            ?: 'Mid-client-R4h2lVBQk2PCdbWz';
+
+        // 2. Otomatis deteksi: jika key diawali 'Mid-server-' (bukan SB-), maka Production
+        if (strpos(self::$serverKey, 'SB-') === 0) {
+            self::$isProduction = false;
+        } else {
+            self::$isProduction = true;
         }
 
-        if (file_exists($envFile)) {
-            $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if ($line === '' || $line[0] === '#') continue;
-                if (strpos($line, '=') === false) continue;
-                $parts = explode('=', $line, 2);
-                $key   = trim($parts[0]);
-                $val   = trim($parts[1] ?? '');
-                // Hapus tanda kutip jika ada
-                $val = trim($val, "\"'");
-                $_ENV[$key] = $val;
-                putenv("$key=$val");
-            }
+        // Override jika ada env eksplisit
+        $envProd = $_ENV['MIDTRANS_IS_PRODUCTION'] ?? $_SERVER['MIDTRANS_IS_PRODUCTION'] ?? getenv('MIDTRANS_IS_PRODUCTION');
+        if ($envProd !== false && $envProd !== null && $envProd !== '') {
+            self::$isProduction = filter_var($envProd, FILTER_VALIDATE_BOOLEAN);
         }
 
-        self::$serverKey    = $_ENV['MIDTRANS_SERVER_KEY']    ?? (getenv('MIDTRANS_SERVER_KEY') ?: '');
-        self::$clientKey    = $_ENV['MIDTRANS_CLIENT_KEY']    ?? (getenv('MIDTRANS_CLIENT_KEY') ?: '');
-        $isProd             = $_ENV['MIDTRANS_IS_PRODUCTION'] ?? (getenv('MIDTRANS_IS_PRODUCTION') ?: 'false');
-        self::$isProduction = filter_var($isProd, FILTER_VALIDATE_BOOLEAN);
-
+        // 3. Tentukan URL Endpoint Midtrans
         self::$snapUrl = self::$isProduction
             ? 'https://app.midtrans.com/snap/v1/transactions'
             : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
@@ -67,14 +64,14 @@ class MidtransConfig
                 'Accept: application/json',
                 'Authorization: Basic ' . $auth,
             ],
-            CURLOPT_SSL_VERIFYPEER => false, // Lokal dev; aktifkan di production
+            CURLOPT_SSL_VERIFYPEER => false,
         ]);
 
         $response  = curl_exec($ch);
         $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $result = json_decode($response, true);
+        $result = json_decode($response, true) ?: [];
         $result['http_code'] = $httpCode;
         return $result;
     }
