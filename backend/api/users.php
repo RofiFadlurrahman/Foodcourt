@@ -38,27 +38,40 @@ try {
             echo json_encode(format_db_row($users));
             break;
             
-        case 'POST':
-            // Admin can create users, or anonymous can register a new account (e.g. registration pages)
-// Ambil input JSON dari frontend
-$input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+                case 'POST':
+            $rawInput = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            $input = $rawInput['user'] ?? $rawInput['data'] ?? $rawInput;
 
-$username = trim($input['username'] ?? '');
-$password = trim($input['password'] ?? '');
-$email    = trim($input['email'] ?? '');
-$role     = trim($input['role'] ?? 'tenant');
+            // Baca username & password
+            $username = trim($input['username'] ?? $input['user_name'] ?? $rawInput['username'] ?? '');
+            $password = trim($input['password'] ?? $input['pass'] ?? $rawInput['password'] ?? '');
 
-// Terima fullName dari berbagai kemungkinan nama field dari frontend
-$fullName = trim($input['fullName'] ?? $input['nama_lengkap'] ?? $input['nama_pemilik'] ?? $input['name'] ?? $input['nama_tenant'] ?? '');
+            // Baca email dengan fallback
+            $email = trim($input['email'] ?? $input['user_email'] ?? $rawInput['email'] ?? '');
 
-if (empty($username) || empty($password) || empty($email) || empty($fullName)) {
-    http_response_code(400);
-    echo json_encode([
-        'error' => 'Username, password, nama lengkap, dan email wajib diisi.',
-        'received' => $input // Membantu debugging jika masih ada yang kosong
-    ]);
-    exit();
-}
+            // Baca nama lengkap / nama pemilik / nama tenant
+            $fullName = trim($input['fullName'] ?? $input['nama_lengkap'] ?? $input['nama_pemilik'] ?? $input['namaTenant'] ?? $input['nama_tenant'] ?? $input['name'] ?? $rawInput['fullName'] ?? $rawInput['nama_pemilik'] ?? $rawInput['nama_tenant'] ?? '');
+
+            $role   = trim($input['role'] ?? $rawInput['role'] ?? 'tenant');
+            $avatar = trim($input['avatar'] ?? $input['foto'] ?? $rawInput['avatar'] ?? $rawInput['foto'] ?? '');
+
+            // Fallback cerdas jika nama / email terlewat dari format frontend
+            if (empty($fullName)) {
+                $fullName = !empty($username) ? 'Tenant ' . $username : 'Tenant Baru';
+            }
+            if (empty($email)) {
+                $email = !empty($username) ? strtolower($username) . '@foodcourt.com' : 'tenant@foodcourt.com';
+            }
+
+            // Validasi utama hanya username dan password
+            if (empty($username) || empty($password)) {
+                http_response_code(400);
+                echo json_encode([
+                    'error' => 'Username dan password wajib diisi.',
+                    'received' => $rawInput
+                ]);
+                exit();
+            }
 
             // Check if username already exists
             $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
