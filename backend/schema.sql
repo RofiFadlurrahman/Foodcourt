@@ -70,6 +70,9 @@ CREATE TABLE `transactions` (
     `total_harga` DECIMAL(10,2) NOT NULL,
     `tanggal_transaksi` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `metode_pembayaran` ENUM('Cash', 'QRIS', 'Debit', 'Midtrans') NOT NULL DEFAULT 'Cash',
+    `midtrans_order_id` VARCHAR(255) NULL,
+    `snap_token` VARCHAR(255) NULL,
+    `payment_status` VARCHAR(50) DEFAULT 'pending',
     FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
     FOREIGN KEY (`menu_id`) REFERENCES `menus` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
