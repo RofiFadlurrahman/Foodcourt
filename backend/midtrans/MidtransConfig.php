@@ -13,38 +13,22 @@ class MidtransConfig
 
     public static function init(): void
     {
-        // 1. Ambil Key dari ENV / SERVER / Fallback langsung
+        // Key langsung dari dashboard Midtrans Anda
         self::$serverKey = $_ENV['MIDTRANS_SERVER_KEY'] 
             ?? $_SERVER['MIDTRANS_SERVER_KEY'] 
             ?? getenv('MIDTRANS_SERVER_KEY') 
-            ?: 'Mid-server-cOI5_k1MGlAWjsrvuSnHItSI';
+            ?: 'Mid-server-coI5_k1MGiAWjsrvuSnHIt5I';
 
         self::$clientKey = $_ENV['MIDTRANS_CLIENT_KEY'] 
             ?? $_SERVER['MIDTRANS_CLIENT_KEY'] 
             ?? getenv('MIDTRANS_CLIENT_KEY') 
-            ?: 'Mid-client-R4h2lVBQk2PCdbWz';
+            ?: 'Mid-client-R4hZlVBQk2PcDbWz';
 
-        // 2. Otomatis deteksi: jika key diawali 'Mid-server-' (bukan SB-), maka Production
-        if (strpos(self::$serverKey, 'SB-') === 0) {
-            self::$isProduction = false;
-        } else {
-            self::$isProduction = true;
-        }
+        // Selalu true karena ini akun Production Midtrans
+        self::$isProduction = true;
 
-        // Override jika ada env eksplisit
-        $envProd = $_ENV['MIDTRANS_IS_PRODUCTION'] ?? $_SERVER['MIDTRANS_IS_PRODUCTION'] ?? getenv('MIDTRANS_IS_PRODUCTION');
-        if ($envProd !== false && $envProd !== null && $envProd !== '') {
-            self::$isProduction = filter_var($envProd, FILTER_VALIDATE_BOOLEAN);
-        }
-
-        // 3. Tentukan URL Endpoint Midtrans
-        self::$snapUrl = self::$isProduction
-            ? 'https://app.midtrans.com/snap/v1/transactions'
-            : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
-
-        self::$apiUrl = self::$isProduction
-            ? 'https://api.midtrans.com/v2'
-            : 'https://api.sandbox.midtrans.com/v2';
+        self::$snapUrl = 'https://app.midtrans.com/snap/v1/transactions';
+        self::$apiUrl  = 'https://api.midtrans.com/v2';
     }
 
     /** Buat Snap Token dari payload order */
