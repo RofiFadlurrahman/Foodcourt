@@ -13,7 +13,6 @@ class MidtransConfig
 
     public static function init(): void
     {
-        // Key langsung dari dashboard Midtrans Anda
         self::$serverKey = $_ENV['MIDTRANS_SERVER_KEY'] 
             ?? $_SERVER['MIDTRANS_SERVER_KEY'] 
             ?? getenv('MIDTRANS_SERVER_KEY') 
@@ -24,11 +23,10 @@ class MidtransConfig
             ?? getenv('MIDTRANS_CLIENT_KEY') 
             ?: 'Mid-client-R4hZlVBQk2PcDbWz';
 
-        // Selalu true karena ini akun Production Midtrans
-        self::$isProduction = true;
-
-        self::$snapUrl = 'https://app.midtrans.com/snap/v1/transactions';
-        self::$apiUrl  = 'https://api.midtrans.com/v2';
+        // Set ke Sandbox
+        self::$isProduction = false;
+        self::$snapUrl = 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+        self::$apiUrl  = 'https://api.sandbox.midtrans.com/v2';
     }
 
     /** Buat Snap Token dari payload order */
