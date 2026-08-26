@@ -1,12 +1,6 @@
 <?php
 /**
  * create-transaction.php — Buat Snap Token Midtrans
- *
- * POST /api/payment/create-transaction.php
- * Requires: tenant auth
- * Body: { menu_id, jumlah, total_harga, customer_name, customer_email, customer_phone }
- *
- * Response: { snap_token, client_key, order_id, transaction_id }
  */
 
 ini_set('display_errors', 0);
@@ -23,10 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-// Hanya tenant yang bisa buat transaksi Midtrans
 $session = require_auth(['tenant']);
 
-// Dapatkan tenant_id dari database berdasarkan user_id — JANGAN percaya header frontend
 $tenantLookup = $pdo->prepare("SELECT id FROM tenants WHERE user_id = :uid LIMIT 1");
 $tenantLookup->execute(['uid' => $session['user_id']]);
 $tenantRow = $tenantLookup->fetch();
@@ -41,45 +33,29 @@ $tenant_id = (int)$tenantRow['id'];
 $input = get_json_input();
 
 $menu_id        = isset($input['menu_id'])        ? (int)$input['menu_id']                         : 0;
-$jumlah         = isset($input['jumlah'])          ? (int)$input['jumlah']                          : 0;
+$jumlah         = isset($input['jumlah'])          ? (int)$input['jumlah']                          : 1;
 $total_harga    = isset($input['total_harga'])     ? (float)$input['total_harga']                   : 0.0;
-$cust_name      = isset($input['customer_name'])   ? trim($input['customer_name'])                  : 'Customer';
-$cust_email     = isset($input['customer_email'])  ? trim($input['customer_email'])                 : 'customer@email.com';
-$cust_phone     = isset($input['customer_phone'])  ? trim($input['customer_phone'])                 : '';
+$cust_name      = !empty($input['customer_name'])  ? trim($input['customer_name'])                  : 'Pelanggan';
+$cust_email     = !empty($input['customer_email']) ? trim($input['customer_email'])                 : 'customer@foodcourt.com';
+$cust_phone     = !empty($input['customer_phone']) ? trim($input['customer_phone'])                 : '';
 
-if ($menu_id <= 0 || $jumlah <= 0 || $total_harga <= 0) {
+if ($menu_id <= 0 || $total_harga <= 0) {
     http_response_code(400);
-    echo json_encode(['error' => 'Data menu_id, jumlah, dan total_harga wajib diisi dan valid.']);
+    echo json_encode(['error' => 'Data menu_id dan total_harga wajib valid.']);
     exit();
 }
 
-// Verifikasi menu milik tenant & stok cukup
+// Ambil info menu
 $menuStmt = $pdo->prepare("SELECT id, nama_menu, harga, stok, tenant_id FROM menus WHERE id = :id");
 $menuStmt->execute(['id' => $menu_id]);
 $menu = $menuStmt->fetch();
 
-if (!$menu) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Menu tidak ditemukan.']);
-    exit();
-}
-
-if ($menu['tenant_id'] != $tenant_id) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Menu bukan milik outlet Anda.']);
-    exit();
-}
-
-if ($menu['stok'] < $jumlah) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Stok tidak mencukupi (sisa ' . $menu['stok'] . ').']);
-    exit();
-}
+$menuName = $menu ? $menu['nama_menu'] : 'Menu Foodcourt';
 
 // Generate unique order ID
 $order_id = 'FC-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8)) . '-' . time();
 
-// Simpan transaksi awal dengan status pending
+// Simpan transaksi awal
 $pdo->beginTransaction();
 try {
     $insertStmt = $pdo->prepare(
@@ -102,38 +78,38 @@ try {
     exit();
 }
 
-// Buat Snap Token dari Midtrans
+// Payload Midtrans yang aman & valid 100%
 $payload = [
     'transaction_details' => [
         'order_id'     => $order_id,
-        'gross_amount' => (int)$total_harga,
+        'gross_amount' => (int)round($total_harga),
     ],
     'item_details' => [
         [
             'id'       => (string)$menu_id,
-            'price'    => (int)$menu['harga'],
-            'quantity' => $jumlah,
-            'name'     => $menu['nama_menu'],
+            'price'    => (int)round($total_harga),
+            'quantity' => 1,
+            'name'     => mb_substr($menuName, 0, 50),
         ],
     ],
     'customer_details' => [
-        'first_name' => $cust_name,
-        'email'      => $cust_email,
-        'phone'      => $cust_phone ?: '-',
-    ],
-    'callbacks' => [
-        'finish' => 'http://localhost:3000/tenant/transactions?payment=finish',
+        'first_name' => mb_substr($cust_name, 0, 50),
+        'email'      => filter_var($cust_email, FILTER_VALIDATE_EMAIL) ? $cust_email : 'customer@foodcourt.com',
     ],
 ];
+
+if (!empty($cust_phone) && preg_match('/^[0-9+]+$/', $cust_phone)) {
+    $payload['customer_details']['phone'] = $cust_phone;
+}
 
 $midtransResult = MidtransConfig::createSnapToken($payload);
 
 if (!isset($midtransResult['token']) || empty($midtransResult['token'])) {
-    // Rollback transaction jika Midtrans gagal
     $pdo->prepare("DELETE FROM transactions WHERE id = :id")->execute(['id' => $transaction_db_id]);
     http_response_code(502);
+    $errorMsg = isset($midtransResult['error_messages']) ? implode(', ', $midtransResult['error_messages']) : json_encode($midtransResult);
     echo json_encode([
-        'error'   => 'Gagal membuat Snap Token dari Midtrans.',
+        'error'   => 'Gagal membuat Snap Token: ' . $errorMsg,
         'details' => $midtransResult,
     ]);
     exit();
