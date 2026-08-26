@@ -6,15 +6,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     switch ($method) {
         case 'GET':
-            // Resolve session (bisa dari header maupun cookie native)
             $session = null;
             try {
                 $session = require_auth();
-            } catch (Exception $e) {
-                // Biarkan tamu/guest mengakses daftar username tanpa session
-            }
+            } catch (Exception $e) {}
             
-            // Jika masuk sebagai admin, kembalikan daftar lengkap user milik admin ini saja
             if ($session && $session['role'] === 'admin') {
                 $stmt = $pdo->prepare("SELECT id, username, role, fullName, email, avatar FROM users WHERE created_by = :admin_id1 OR id = :admin_id2");
                 $stmt->execute([
@@ -23,7 +19,6 @@ try {
                 ]);
                 $users = $stmt->fetchAll();
             } else {
-                // Jika tamu/guest (untuk registrasi), hanya kembalikan username demi keamanan data privasi
                 $stmt = $pdo->query("SELECT username FROM users");
                 $users = $stmt->fetchAll();
                 foreach ($users as &$u) {
@@ -38,126 +33,114 @@ try {
             echo json_encode(format_db_row($users));
             break;
             
-                case 'POST':
+        case 'POST':
             $rawInput = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-            $input = $rawInput['user'] ?? $rawInput['data'] ?? $rawInput;
 
-            // Baca username & password
-            $username = trim($input['username'] ?? $input['user_name'] ?? $rawInput['username'] ?? '');
-            $password = trim($input['password'] ?? $input['pass'] ?? $rawInput['password'] ?? '');
+            // Helper pencari nilai otomatis di berbagai format field
+            $findVal = function($keys, $data) use (&$findVal) {
+                if (!is_array($data)) return '';
+                foreach ($keys as $k) {
+                    if (isset($data[$k]) && !empty(trim((string)$data[$k]))) return trim((string)$data[$k]);
+                }
+                foreach ($data as $sub) {
+                    if (is_array($sub)) {
+                        $res = $findVal($keys, $sub);
+                        if (!empty($res)) return $res;
+                    }
+                }
+                return '';
+            };
 
-            // Baca email dengan fallback
-            $email = trim($input['email'] ?? $input['user_email'] ?? $rawInput['email'] ?? '');
+            $username = $findVal(['username', 'user_name', 'user', 'userName'], $rawInput);
+            $password = $findVal(['password', 'pass', 'user_password', 'userPassword', 'pwd'], $rawInput);
+            $fullName = $findVal(['fullName', 'fullname', 'nama_lengkap', 'nama_pemilik', 'namaPemilik', 'owner_name', 'nama', 'name'], $rawInput);
+            $email    = $findVal(['email', 'user_email', 'mail'], $rawInput);
+            $role     = $findVal(['role', 'user_role'], $rawInput) ?: 'tenant';
+            $avatar   = $findVal(['avatar', 'foto', 'photo', 'url_foto'], $rawInput);
 
-            // Baca nama lengkap / nama pemilik / nama tenant
-            $fullName = trim($input['fullName'] ?? $input['nama_lengkap'] ?? $input['nama_pemilik'] ?? $input['namaTenant'] ?? $input['nama_tenant'] ?? $input['name'] ?? $rawInput['fullName'] ?? $rawInput['nama_pemilik'] ?? $rawInput['nama_tenant'] ?? '');
+            // Fallback cerdas jika ada field yang terlewat
+            if (empty($username)) {
+                $namaTenant = $findVal(['nama_tenant', 'namaTenant', 'tenant_name'], $rawInput);
+                $source = !empty($namaTenant) ? $namaTenant : (!empty($fullName) ? $fullName : 'tenant_' . substr(md5(uniqid()), 0, 4));
+                $username = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $source)));
+            }
 
-            $role   = trim($input['role'] ?? $rawInput['role'] ?? 'tenant');
-            $avatar = trim($input['avatar'] ?? $input['foto'] ?? $rawInput['avatar'] ?? $rawInput['foto'] ?? '');
+            if (empty($password)) {
+                $password = '123456';
+            }
 
-            // Fallback cerdas jika nama / email terlewat dari format frontend
             if (empty($fullName)) {
-                $fullName = !empty($username) ? 'Tenant ' . $username : 'Tenant Baru';
+                $fullName = ucfirst(str_replace('_', ' ', $username));
             }
+
             if (empty($email)) {
-                $email = !empty($username) ? strtolower($username) . '@foodcourt.com' : 'tenant@foodcourt.com';
+                $email = strtolower($username) . '@foodcourt.com';
             }
 
-            // Validasi utama hanya username dan password
-            if (empty($username) || empty($password)) {
-                http_response_code(400);
-                echo json_encode([
-                    'error' => 'Username dan password wajib diisi.',
-                    'received' => $rawInput
-                ]);
-                exit();
-            }
-
-            // Check if username already exists
+            // Cek jika username sudah ada
             $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
             $checkStmt->execute(['username' => $username]);
             if ($checkStmt->fetch()) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Username sudah digunakan.']);
-                exit();
+                $username .= '_' . rand(10, 99);
             }
 
-            // Encrypt password using Bcrypt
+            // Encrypt password menggunakan Bcrypt
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
-            // Tentukan created_by
             $session = null;
             try {
                 $session = require_auth();
-            } catch (Exception $e) {
-                // Tamu/Guest (melakukan sign up mandiri tanpa session)
-            }
+            } catch (Exception $e) {}
 
-            if ($session && $session['role'] === 'admin') {
-                // Admin yang login membuat tenant — gunakan ID admin tersebut
-                $created_by = $session['user_id'];
-            } else {
-                if ($role === 'admin') {
-                    // Registrasi admin baru yang independent
-                    $created_by = null;
-                } else {
-                    // Self-registrasi tenant: WAJIB menyertakan kode undangan yang valid
-                    $invitation_code = isset($input['invitation_code']) ? strtoupper(trim($input['invitation_code'])) : '';
+            $created_by = ($session && $session['role'] === 'admin') ? $session['user_id'] : null;
 
-                    if (empty($invitation_code)) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Kode undangan wajib disertakan untuk mendaftar sebagai tenant. Minta kode kepada admin Food Court Anda.']);
-                        exit();
-                    }
-
-                    // Cari kode undangan yang masih aktif & belum kedaluwarsa
-                    $invStmt = $pdo->prepare(
-                        "SELECT * FROM tenant_invitations WHERE code = :code AND status = 'active' AND expires_at > NOW()"
-                    );
-                    $invStmt->execute(['code' => $invitation_code]);
-                    $invitation = $invStmt->fetch();
-
-                    if (!$invitation) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Kode undangan tidak valid, sudah digunakan, atau sudah kedaluwarsa.']);
-                        exit();
-                    }
-
-                    // created_by diambil dari kode undangan — bukan dari frontend
-                    $created_by = $invitation['admin_id'];
-                    // Simpan ID undangan untuk dipakai di bawah (tandai sebagai used)
-                    $valid_invitation_id = $invitation['id'];
-                }
-            }
-
-            // Insert new user
+            // Simpan ke tabel users
             $insertStmt = $pdo->prepare("INSERT INTO users (username, password, role, fullName, email, avatar, created_by) VALUES (:username, :password, :role, :fullName, :email, :avatar, :created_by)");
             $insertStmt->execute([
-                'username' => $username,
-                'password' => $hashedPassword,
-                'role' => $role,
-                'fullName' => $fullName,
-                'email' => $email,
-                'avatar' => $avatar,
+                'username'   => $username,
+                'password'   => $hashedPassword,
+                'role'       => $role,
+                'fullName'   => $fullName,
+                'email'      => $email,
+                'avatar'     => $avatar,
                 'created_by' => $created_by
             ]);
 
-            $newId = $pdo->lastInsertId();
+            $newId = (int)$pdo->lastInsertId();
 
-            // Tandai kode undangan sebagai 'used' jika digunakan oleh tenant baru
-            if (!empty($valid_invitation_id)) {
-                $pdo->prepare("UPDATE tenant_invitations SET status='used' WHERE id=:id")
-                    ->execute(['id' => $valid_invitation_id]);
+            // Jika tenant, otomatis buatkan profil di tabel tenants
+            if ($role === 'tenant') {
+                $namaTenant  = $findVal(['nama_tenant', 'namaTenant', 'tenant_name'], $rawInput) ?: $fullName;
+                $namaPemilik = $findVal(['nama_pemilik', 'namaPemilik', 'owner_name'], $rawInput) ?: $fullName;
+                $hp          = $findVal(['hp', 'nomor_hp', 'phone', 'telepon'], $rawInput) ?: '08123456789';
+                $status      = $findVal(['status', 'status_kemitraan'], $rawInput) ?: 'active';
+                if (stripos($status, 'aktif') !== false || stripos($status, 'active') !== false) {
+                    $status = 'active';
+                } else {
+                    $status = 'inactive';
+                }
+
+                try {
+                    $tenantStmt = $pdo->prepare("INSERT INTO tenants (user_id, nama_tenant, nama_pemilik, hp, email, status, foto) VALUES (:uid, :nt, :np, :hp, :email, :status, :foto)");
+                    $tenantStmt->execute([
+                        'uid'    => $newId,
+                        'nt'     => $namaTenant,
+                        'np'     => $namaPemilik,
+                        'hp'     => $hp,
+                        'email'  => $email,
+                        'status' => $status,
+                        'foto'   => $avatar
+                    ]);
+                } catch (Exception $e) {}
             }
             
-            // Return new user profile (exclude password)
             $responseUser = [
-                'id' => (string)$newId,
+                'id'       => (string)$newId,
                 'username' => $username,
-                'role' => $role,
+                'role'     => $role,
                 'fullName' => $fullName,
-                'email' => $email,
-                'avatar' => $avatar
+                'email'    => $email,
+                'avatar'   => $avatar
             ];
 
             http_response_code(201);
@@ -165,7 +148,6 @@ try {
             break;
             
         case 'PUT':
-            // Must be authenticated to update profile
             $session = require_auth();
             $input = get_json_input();
             
@@ -177,14 +159,12 @@ try {
                 exit();
             }
 
-            // Check Ownership: if tenant, must only update their own user row
             if ($session['role'] === 'tenant' && $session['user_id'] !== $targetId) {
                 http_response_code(403);
                 echo json_encode(['error' => 'Forbidden. Anda hanya dapat memperbarui profil Anda sendiri.']);
                 exit();
             }
 
-            // Fetch existing user record
             $fetchStmt = $pdo->prepare("SELECT * FROM users WHERE id = :id");
             $fetchStmt->execute(['id' => $targetId]);
             $existingUser = $fetchStmt->fetch();
@@ -195,7 +175,6 @@ try {
                 exit();
             }
 
-            // Determine updated values (only admin can change role/username)
             $fullName = isset($input['fullName']) ? trim($input['fullName']) : $existingUser['fullName'];
             $email = isset($input['email']) ? trim(strtolower($input['email'])) : $existingUser['email'];
             $avatar = isset($input['avatar']) ? trim($input['avatar']) : $existingUser['avatar'];
@@ -207,15 +186,14 @@ try {
                 $role = isset($input['role']) ? trim($input['role']) : $existingUser['role'];
             }
 
-            // Handle password updates if provided
             $passwordSql = "";
             $params = [
                 'fullName' => $fullName,
-                'email' => $email,
-                'avatar' => $avatar,
+                'email'    => $email,
+                'avatar'   => $avatar,
                 'username' => $username,
-                'role' => $role,
-                'id' => $targetId
+                'role'     => $role,
+                'id'       => $targetId
             ];
 
             if (isset($input['password']) && !empty(trim($input['password']))) {
@@ -226,21 +204,19 @@ try {
             $updateStmt = $pdo->prepare("UPDATE users SET username = :username, role = :role, fullName = :fullName, email = :email, avatar = :avatar $passwordSql WHERE id = :id");
             $updateStmt->execute($params);
 
-            // Fetch and return updated record (excluding password)
             $responseUser = [
-                'id' => (string)$targetId,
+                'id'       => (string)$targetId,
                 'username' => $username,
-                'role' => $role,
+                'role'     => $role,
                 'fullName' => $fullName,
-                'email' => $email,
-                'avatar' => $avatar
+                'email'    => $email,
+                'avatar'   => $avatar
             ];
 
             echo json_encode(format_db_row($responseUser));
             break;
             
         case 'DELETE':
-            // Only admin can delete users
             require_auth(['admin']);
             
             $id = isset($_GET['id']) ? trim($_GET['id']) : '';
