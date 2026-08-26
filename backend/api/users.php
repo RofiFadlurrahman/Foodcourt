@@ -34,13 +34,19 @@ try {
             break;
             
         case 'POST':
-            $rawInput = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            // Baca data baik format JSON maupun Form-Data POST
+            $rawInput = json_decode(file_get_contents('php://input'), true);
+            if (!is_array($rawInput)) {
+                $rawInput = !empty($_POST) ? $_POST : [];
+            }
 
-            // Helper pencari nilai otomatis di berbagai format field
+            // Fungsi pencari rekursif ke seluruh nested array/object
             $findVal = function($keys, $data) use (&$findVal) {
                 if (!is_array($data)) return '';
                 foreach ($keys as $k) {
-                    if (isset($data[$k]) && !empty(trim((string)$data[$k]))) return trim((string)$data[$k]);
+                    if (isset($data[$k]) && is_string($data[$k]) && trim($data[$k]) !== '') {
+                        return trim($data[$k]);
+                    }
                 }
                 foreach ($data as $sub) {
                     if (is_array($sub)) {
@@ -51,18 +57,19 @@ try {
                 return '';
             };
 
-            $username = $findVal(['username', 'user_name', 'user', 'userName'], $rawInput);
-            $password = $findVal(['password', 'pass', 'user_password', 'userPassword', 'pwd'], $rawInput);
+            $username = $findVal(['username', 'user_name', 'user', 'userName', 'login_username'], $rawInput);
+            $password = $findVal(['password', 'pass', 'user_password', 'userPassword', 'pwd', 'login_password'], $rawInput);
             $fullName = $findVal(['fullName', 'fullname', 'nama_lengkap', 'nama_pemilik', 'namaPemilik', 'owner_name', 'nama', 'name'], $rawInput);
             $email    = $findVal(['email', 'user_email', 'mail'], $rawInput);
             $role     = $findVal(['role', 'user_role'], $rawInput) ?: 'tenant';
-            $avatar   = $findVal(['avatar', 'foto', 'photo', 'url_foto'], $rawInput);
+            $avatar   = $findVal(['avatar', 'foto', 'photo', 'url_foto', 'foto_outlet'], $rawInput);
+            $namaTenant = $findVal(['nama_tenant', 'namaTenant', 'tenant_name', 'outlet_name', 'nama_outlet'], $rawInput);
+            $hp       = $findVal(['hp', 'nomor_hp', 'phone', 'telepon', 'no_hp'], $rawInput) ?: '08123456789';
 
-            // Fallback cerdas jika ada field yang terlewat
+            // JAMINAN TIDAK AKAN KOSONG (Auto Generate jika terlewat)
             if (empty($username)) {
-                $namaTenant = $findVal(['nama_tenant', 'namaTenant', 'tenant_name'], $rawInput);
-                $source = !empty($namaTenant) ? $namaTenant : (!empty($fullName) ? $fullName : 'tenant_' . substr(md5(uniqid()), 0, 4));
-                $username = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $source)));
+                $src = !empty($namaTenant) ? $namaTenant : (!empty($fullName) ? $fullName : 'tenant_' . rand(100, 999));
+                $username = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $src)));
             }
 
             if (empty($password)) {
@@ -70,21 +77,20 @@ try {
             }
 
             if (empty($fullName)) {
-                $fullName = ucfirst(str_replace('_', ' ', $username));
+                $fullName = !empty($namaTenant) ? $namaTenant : ucfirst(str_replace('_', ' ', $username));
             }
 
             if (empty($email)) {
                 $email = strtolower($username) . '@foodcourt.com';
             }
 
-            // Cek jika username sudah ada
+            // Pastikan username unik
             $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
             $checkStmt->execute(['username' => $username]);
             if ($checkStmt->fetch()) {
                 $username .= '_' . rand(10, 99);
             }
 
-            // Encrypt password menggunakan Bcrypt
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
             $session = null;
@@ -94,7 +100,7 @@ try {
 
             $created_by = ($session && $session['role'] === 'admin') ? $session['user_id'] : null;
 
-            // Simpan ke tabel users
+            // Simpan User ke DB
             $insertStmt = $pdo->prepare("INSERT INTO users (username, password, role, fullName, email, avatar, created_by) VALUES (:username, :password, :role, :fullName, :email, :avatar, :created_by)");
             $insertStmt->execute([
                 'username'   => $username,
@@ -108,24 +114,23 @@ try {
 
             $newId = (int)$pdo->lastInsertId();
 
-            // Jika tenant, otomatis buatkan profil di tabel tenants
+            // Jika Tenant, otomatis masukkan ke tabel tenants
             if ($role === 'tenant') {
-                $namaTenant  = $findVal(['nama_tenant', 'namaTenant', 'tenant_name'], $rawInput) ?: $fullName;
-                $namaPemilik = $findVal(['nama_pemilik', 'namaPemilik', 'owner_name'], $rawInput) ?: $fullName;
-                $hp          = $findVal(['hp', 'nomor_hp', 'phone', 'telepon'], $rawInput) ?: '08123456789';
-                $status      = $findVal(['status', 'status_kemitraan'], $rawInput) ?: 'active';
-                if (stripos($status, 'aktif') !== false || stripos($status, 'active') !== false) {
-                    $status = 'active';
-                } else {
+                $tName = !empty($namaTenant) ? $namaTenant : $fullName;
+                $tOwner = !empty($fullName) ? $fullName : $tName;
+                $status = $findVal(['status', 'status_kemitraan'], $rawInput) ?: 'active';
+                if (stripos($status, 'inaktif') !== false || stripos($status, 'inactive') !== false) {
                     $status = 'inactive';
+                } else {
+                    $status = 'active';
                 }
 
                 try {
                     $tenantStmt = $pdo->prepare("INSERT INTO tenants (user_id, nama_tenant, nama_pemilik, hp, email, status, foto) VALUES (:uid, :nt, :np, :hp, :email, :status, :foto)");
                     $tenantStmt->execute([
                         'uid'    => $newId,
-                        'nt'     => $namaTenant,
-                        'np'     => $namaPemilik,
+                        'nt'     => $tName,
+                        'np'     => $tOwner,
                         'hp'     => $hp,
                         'email'  => $email,
                         'status' => $status,
