@@ -40,20 +40,25 @@ try {
             
         case 'POST':
             // Admin can create users, or anonymous can register a new account (e.g. registration pages)
-            $input = get_json_input();
-            
-            $username = isset($input['username']) ? trim(strtolower($input['username'])) : '';
-            $password = isset($input['password']) ? trim($input['password']) : '';
-            $role = isset($input['role']) ? trim($input['role']) : 'tenant';
-            $fullName = isset($input['fullName']) ? trim($input['fullName']) : '';
-            $email = isset($input['email']) ? trim(strtolower($input['email'])) : '';
-            $avatar = isset($input['avatar']) ? trim($input['avatar']) : '';
+// Ambil input JSON dari frontend
+$input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
-            if (empty($username) || empty($password) || empty($fullName) || empty($email)) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Username, password, nama lengkap, dan email wajib diisi.']);
-                exit();
-            }
+$username = trim($input['username'] ?? '');
+$password = trim($input['password'] ?? '');
+$email    = trim($input['email'] ?? '');
+$role     = trim($input['role'] ?? 'tenant');
+
+// Terima fullName dari berbagai kemungkinan nama field dari frontend
+$fullName = trim($input['fullName'] ?? $input['nama_lengkap'] ?? $input['nama_pemilik'] ?? $input['name'] ?? $input['nama_tenant'] ?? '');
+
+if (empty($username) || empty($password) || empty($email) || empty($fullName)) {
+    http_response_code(400);
+    echo json_encode([
+        'error' => 'Username, password, nama lengkap, dan email wajib diisi.',
+        'received' => $input // Membantu debugging jika masih ada yang kosong
+    ]);
+    exit();
+}
 
             // Check if username already exists
             $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
